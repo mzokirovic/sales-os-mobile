@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class CurrentUser {
   const CurrentUser({
     required this.id,
@@ -21,5 +23,29 @@ class CurrentUser {
       phone: json['phone'] as String,
       role: json['role'] as String,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'tenantId': tenantId,
+      'fullName': fullName,
+      'phone': phone,
+      'role': role,
+    };
+  }
+
+  String toStorageJson() {
+    return jsonEncode(toJson());
+  }
+
+  static CurrentUser? fromStorageJson(String? value) {
+    if (value == null || value.isEmpty) return null;
+
+    final decoded = jsonDecode(value);
+
+    if (decoded is! Map<String, dynamic>) return null;
+
+    return CurrentUser.fromJson(decoded);
   }
 }

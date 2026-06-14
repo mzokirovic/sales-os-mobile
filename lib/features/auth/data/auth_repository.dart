@@ -18,38 +18,48 @@ class AuthRepository {
   }) async {
     final result = await _apiClient.post(
       '/auth/login',
-      withAuth: false,
       body: {
         'phone': phone,
         'password': password,
       },
+      withAuth: false,
     );
 
     if (result is! Map<String, dynamic>) {
       throw const AuthException('Login javobi noto‘g‘ri formatda keldi');
     }
 
-    final accessToken = result['accessToken']?.toString();
-
-    if (accessToken == null || accessToken.isEmpty) {
-      throw const AuthException('Access token kelmadi');
-    }
-
-    await _authStorage.saveAccessToken(accessToken);
-
+    final token = result['accessToken'] as String?;
     final userJson = result['user'];
 
+    if (token == null || token.isEmpty) {
+      throw const AuthException('Token kelmadi');
+    }
+
+    await _authStorage.saveAccessToken(token);
+
+    CurrentUser user;
+
     if (userJson is Map<String, dynamic>) {
-      return CurrentUser.fromJson(userJson);
+      user = CurrentUser.fromJson(userJson);
+    } else {
+      final meResult = await _apiClient.get('/auth/me');
+
+      if (meResult is! Map<String, dynamic>) {
+        throw const AuthException('Foydalanuvchi ma’lumoti kelmadi');
+      }
+
+      user = CurrentUser.fromJson(meResult);
     }
 
-    final meResult = await _apiClient.get('/auth/me');
+    await _authStorage.saveCurrentUserJson(user.toStorageJson());
 
-    if (meResult is! Map<String, dynamic>) {
-      throw const AuthException('User ma’lumotlari noto‘g‘ri formatda keldi');
-    }
+    return user;
+  }
 
-    return CurrentUser.fromJson(meResult);
+  Future<CurrentUser?> readCurrentUser() async {
+    final json = await _authStorage.readCurrentUserJson();
+    return CurrentUser.fromStorageJson(json);
   }
 
   Future<void> logout() {

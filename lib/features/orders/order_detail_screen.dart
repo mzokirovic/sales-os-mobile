@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/auth/current_user.dart';
+import '../../features/auth/data/auth_repository.dart';
 import '../../shared/widgets/error_view.dart';
 import '../../shared/widgets/loading_view.dart';
 import 'order_models.dart';
+import 'order_status_policy.dart';
 import 'orders_repository.dart';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -20,56 +23,32 @@ class OrderDetailScreen extends StatefulWidget {
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final _ordersRepository = OrdersRepository();
+  final _authRepository = AuthRepository();
 
   late Future<OrderModel> _orderFuture;
+  late Future<CurrentUser?> _currentUserFuture;
+
   bool _isUpdatingStatus = false;
-
-  static const _nextStatusMap = <String, String?>{
-    'NEW': 'CHECKED',
-    'CHECKED': 'CONFIRMED',
-    'CONFIRMED': 'PREPARING',
-    'PREPARING': 'SHIPPED',
-    'SHIPPED': 'DELIVERED',
-    'DELIVERED': 'PAID',
-    'PAID': null,
-  };
-
-  static const _statusLabels = <String, String>{
-    'NEW': 'Yangi',
-    'CHECKED': 'Tekshirildi',
-    'CONFIRMED': 'Tasdiqlandi',
-    'PREPARING': 'Tayyorlanmoqda',
-    'SHIPPED': 'Yo‘lda',
-    'DELIVERED': 'Yetkazildi',
-    'PAID': 'Yopildi',
-  };
-
-  static const _actionLabels = <String, String>{
-    'NEW': 'Tekshirishga yuborish',
-    'CHECKED': 'Tasdiqlash',
-    'CONFIRMED': 'Skladga berish',
-    'PREPARING': 'Yo‘lga chiqarish',
-    'SHIPPED': 'Yetkazildi',
-    'DELIVERED': 'To‘liq yopish',
-    'PAID': 'Yopilgan',
-  };
 
   @override
   void initState() {
     super.initState();
     _orderFuture = _ordersRepository.getOrder(widget.orderId);
+    _currentUserFuture = _authRepository.readCurrentUser();
   }
 
   void _reload() {
     setState(() {
       _orderFuture = _ordersRepository.getOrder(widget.orderId);
+      _currentUserFuture = _authRepository.readCurrentUser();
     });
   }
 
-  Future<void> _moveNext(OrderModel order) async {
-    final nextStatus = _nextStatusMap[order.status];
-
-    if (nextStatus == null || _isUpdatingStatus) return;
+  Future<void> _moveNext({
+    required OrderModel order,
+    required String nextStatus,
+  }) async {
+    if (_isUpdatingStatus) return;
 
     setState(() {
       _isUpdatingStatus = true;
@@ -85,7 +64,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Status: ${_statusLabel(nextStatus)}'),
+          content: Text('Status: ${OrderStatusPolicy.label(nextStatus)}'),
         ),
       );
 
@@ -106,10 +85,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         });
       }
     }
-  }
-
-  String _statusLabel(String status) {
-    return _statusLabels[status] ?? status;
   }
 
   String _formatMoney(num value) {
@@ -150,19 +125,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ),
       body: FutureBuilder<OrderModel>(
         future: _orderFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+        builder: (context, orderSnapshot) {
+          if (orderSnapshot.connectionState == ConnectionState.waiting) {
             return const LoadingView();
           }
 
-          if (snapshot.hasError) {
+          if (orderSnapshot.hasError) {
             return ErrorView(
-              message: snapshot.error.toString(),
+              message: orderSnapshot.error.toString(),
               onRetry: _reload,
             );
           }
 
-          final order = snapshot.data;
+          final order = orderSnapshot.data;
 
           if (order == null) {
             return ErrorView(
@@ -171,178 +146,294 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             );
           }
 
-          final statusColor = _statusColor(order.status);
-          final nextStatus = _nextStatusMap[order.status];
-          final actionLabel = _actionLabels[order.status] ?? 'Status';
+          return FutureBuilder<CurrentUser?>(
+            future: _currentUserFuture,
+            builder: (context, userSnapshot) {
+              final user = userSnapshot.data;
+              final role = user?.role ?? 'UNKNOWN';
 
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              order.customer.name,
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              _statusLabel(order.status),
-                              style: TextStyle(
-                                color: statusColor,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        order.customer.phone ?? 'Telefon kiritilmagan',
+              final nextStatus = OrderStatusPolicy.nextStatusForRole(
+                role: role,
+                currentStatus: order.status,
+              );
+
+              return _OrderDetailContent(
+                order: order,
+                role: role,
+                nextStatus: nextStatus,
+                isUserLoading:
+                    userSnapshot.connectionState == ConnectionState.waiting,
+                isUpdatingStatus: _isUpdatingStatus,
+                statusColor: _statusColor(order.status),
+                formatMoney: _formatMoney,
+                onMoveNext: nextStatus == null
+                    ? null
+                    : () => _moveNext(
+                          order: order,
+                          nextStatus: nextStatus,
+                        ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _OrderDetailContent extends StatelessWidget {
+  const _OrderDetailContent({
+    required this.order,
+    required this.role,
+    required this.nextStatus,
+    required this.isUserLoading,
+    required this.isUpdatingStatus,
+    required this.statusColor,
+    required this.formatMoney,
+    required this.onMoveNext,
+  });
+
+  final OrderModel order;
+  final String role;
+  final String? nextStatus;
+  final bool isUserLoading;
+  final bool isUpdatingStatus;
+  final Color statusColor;
+  final String Function(num value) formatMoney;
+  final VoidCallback? onMoveNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        order.customer.name,
                         style: const TextStyle(
-                          color: Color(0xFF334155),
-                          fontWeight: FontWeight.w700,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        order.customer.address ?? 'Manzil kiritilmagan',
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                        ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
                       ),
-                      const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _MetricCard(
-                              label: 'Jami',
-                              value: _formatMoney(order.totalAmount),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _MetricCard(
-                              label: 'To‘langan',
-                              value: _formatMoney(order.paidAmount),
-                            ),
-                          ),
-                        ],
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(999),
                       ),
-                      const SizedBox(height: 10),
-                      _MetricCard(
-                        label: 'Qarz',
-                        value: _formatMoney(order.debtAmount),
-                        isDanger: order.debtAmount > 0,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Mahsulotlar',
+                      child: Text(
+                        OrderStatusPolicy.label(order.status),
                         style: TextStyle(
-                          fontSize: 18,
+                          color: statusColor,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      ...order.items.map((item) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Row(
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  order.customer.phone ?? 'Telefon kiritilmagan',
+                  style: const TextStyle(
+                    color: Color(0xFF334155),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  order.customer.address ?? 'Manzil kiritilmagan',
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _MetricCard(
+                        label: 'Jami',
+                        value: formatMoney(order.totalAmount),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _MetricCard(
+                        label: 'To‘langan',
+                        value: formatMoney(order.paidAmount),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _MetricCard(
+                  label: 'Qarz',
+                  value: formatMoney(order.debtAmount),
+                  isDanger: order.debtAmount > 0,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Mahsulotlar',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...order.items.map((item) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.productName,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${item.quantity} dona × ${_formatMoney(item.price)}',
-                                      style: const TextStyle(
-                                        color: Color(0xFF64748B),
-                                      ),
-                                    ),
-                                  ],
+                              Text(
+                                item.productName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
+                              const SizedBox(height: 4),
                               Text(
-                                _formatMoney(item.total),
+                                '${item.quantity} dona × ${formatMoney(item.price)}',
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF64748B),
                                 ),
                               ),
                             ],
                           ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                height: 54,
-                child: FilledButton(
-                  onPressed: nextStatus == null || _isUpdatingStatus
-                      ? null
-                      : () => _moveNext(order),
-                  child: _isUpdatingStatus
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2.4),
-                        )
-                      : Text(actionLabel),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'ID: ${order.id.substring(0, 8)}',
-                textAlign: TextAlign.center,
+                        ),
+                        Text(
+                          formatMoney(item.total),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _RoleActionPanel(
+          role: role,
+          nextStatus: nextStatus,
+          isUserLoading: isUserLoading,
+          isUpdatingStatus: isUpdatingStatus,
+          onMoveNext: onMoveNext,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'ID: ${order.id.substring(0, 8)}',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Color(0xFF94A3B8),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RoleActionPanel extends StatelessWidget {
+  const _RoleActionPanel({
+    required this.role,
+    required this.nextStatus,
+    required this.isUserLoading,
+    required this.isUpdatingStatus,
+    required this.onMoveNext,
+  });
+
+  final String role;
+  final String? nextStatus;
+  final bool isUserLoading;
+  final bool isUpdatingStatus;
+  final VoidCallback? onMoveNext;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isUserLoading) {
+      return const SizedBox(
+        height: 54,
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (nextStatus == null) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.lock_outline_rounded,
+              color: Color(0xFF64748B),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                role == 'SALES'
+                    ? 'Sotuvchi statusni o‘zgartirmaydi'
+                    : 'Bu bosqichda siz uchun action yo‘q',
                 style: const TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontSize: 12,
+                  color: Color(0xFF475569),
                   fontWeight: FontWeight.w700,
                 ),
               ),
-            ],
-          );
-        },
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 54,
+      child: FilledButton(
+        onPressed: isUpdatingStatus ? null : onMoveNext,
+        child: isUpdatingStatus
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
+              )
+            : Text(OrderStatusPolicy.actionLabel(nextStatus!)),
       ),
     );
   }

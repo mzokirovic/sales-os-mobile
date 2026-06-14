@@ -1,15 +1,13 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AuthStorage {
-  AuthStorage({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+  static const _storage = FlutterSecureStorage();
 
   static const _accessTokenKey = 'accessToken';
+  static const _currentUserKey = 'currentUser';
 
-  final FlutterSecureStorage _storage;
-
-  Future<void> saveAccessToken(String token) {
-    return _storage.write(key: _accessTokenKey, value: token);
+  Future<void> saveAccessToken(String token) async {
+    await _storage.write(key: _accessTokenKey, value: token);
   }
 
   Future<String?> readAccessToken() {
@@ -18,11 +16,19 @@ class AuthStorage {
 
   Future<bool> hasAccessToken() async {
     final token = await readAccessToken();
-
     return token != null && token.isNotEmpty;
   }
 
-  Future<void> clear() {
-    return _storage.deleteAll();
+  Future<void> saveCurrentUserJson(String userJson) async {
+    return _storage.write(key: _currentUserKey, value: userJson);
+  }
+
+  Future<String?> readCurrentUserJson() {
+    return _storage.read(key: _currentUserKey);
+  }
+
+  Future<void> clear() async {
+    await _storage.delete(key: _accessTokenKey);
+    await _storage.delete(key: _currentUserKey);
   }
 }
