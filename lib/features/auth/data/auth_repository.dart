@@ -12,6 +12,38 @@ class AuthRepository {
   final ApiClient _apiClient;
   final AuthStorage _authStorage;
 
+  Future<CurrentUser?> bootstrapUser() async {
+    final hasToken = await _authStorage.hasAccessToken();
+
+    if (!hasToken) {
+      return null;
+    }
+
+    final cachedUserJson = await _authStorage.readCurrentUserJson();
+    final cachedUser = CurrentUser.fromStorageJson(cachedUserJson);
+
+    if (cachedUser != null) {
+      return cachedUser;
+    }
+
+    try {
+      final meResult = await _apiClient.get('/auth/me');
+
+      if (meResult is! Map<String, dynamic>) {
+        await _authStorage.clear();
+        return null;
+      }
+
+      final user = CurrentUser.fromJson(meResult);
+      await _authStorage.saveCurrentUserJson(user.toStorageJson());
+
+      return user;
+    } catch (_) {
+      await _authStorage.clear();
+      return null;
+    }
+  }
+
   Future<CurrentUser> login({
     required String phone,
     required String password,
