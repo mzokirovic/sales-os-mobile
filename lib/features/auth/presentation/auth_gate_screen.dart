@@ -42,7 +42,7 @@ class _AuthGateScreenState extends State<AuthGateScreen> {
           if (!context.mounted) return;
 
           if (snapshot.data == true) {
-            context.go('/orders');
+            context.go('/home');
           } else {
             context.go('/login');
           }

@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      context.go('/orders');
+      context.go('/home');
     } on ApiException catch (error) {
       setState(() {
         _error = error.message;
