@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/auth/auth_storage.dart';
+import '../../features/auth/data/auth_repository.dart';
 import '../../shared/widgets/error_view.dart';
 import '../../shared/widgets/loading_view.dart';
 import 'order_models.dart';
+import 'order_status_policy.dart';
 import 'orders_repository.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -16,7 +17,7 @@ class OrdersScreen extends StatefulWidget {
 
 class _OrdersScreenState extends State<OrdersScreen> {
   final _ordersRepository = OrdersRepository();
-  final _authStorage = AuthStorage();
+  final _authRepository = AuthRepository();
 
   late Future<List<OrderModel>> _ordersFuture;
 
@@ -33,7 +34,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Future<void> _logout() async {
-    await _authStorage.clear();
+    await _authRepository.logout();
 
     if (!mounted) return;
 
@@ -41,23 +42,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   String _formatMoney(num value) {
-    return '${value.toInt().toString().replaceAllMapped(
+    return value.toInt().toString().replaceAllMapped(
           RegExp(r'\B(?=(\d{3})+(?!\d))'),
           (match) => ' ',
-        )} so‘m';
-  }
-
-  String _statusLabel(String status) {
-    return switch (status) {
-      'NEW' => 'Yangi',
-      'CHECKED' => 'Tekshirildi',
-      'CONFIRMED' => 'Tasdiqlandi',
-      'PREPARING' => 'Tayyorlanmoqda',
-      'SHIPPED' => 'Yo‘lda',
-      'DELIVERED' => 'Yetkazildi',
-      'PAID' => 'Yopildi',
-      _ => status,
-    };
+        );
   }
 
   Color _statusColor(String status) {
@@ -73,11 +61,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
     };
   }
 
+  String _shortId(String value) {
+    if (value.length <= 8) return value;
+    return value.substring(0, 8);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text('Zakazlar'),
+        leading: IconButton(
+          onPressed: () => context.go('/home'),
+          icon: const Icon(Icons.arrow_back_rounded),
+        ),
         actions: [
           IconButton(
             onPressed: _reload,
@@ -107,7 +105,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
           if (orders.isEmpty) {
             return ErrorView(
-              message: 'Hozircha zakazlar yo‘q',
+              message: 'Zakazlar yo‘q',
               onRetry: _reload,
             );
           }
@@ -117,92 +115,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: orders.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final order = orders[index];
-                final statusColor = _statusColor(order.status);
 
-                return Card(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () => context.go('/orders/${order.id}'),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  order.customer.name,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: statusColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  _statusLabel(order.status),
-                                  style: TextStyle(
-                                    color: statusColor,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            order.customer.address ?? 'Manzil kiritilmagan',
-                            style: const TextStyle(
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _MetricBox(
-                                  label: 'Jami',
-                                  value: _formatMoney(order.totalAmount),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: _MetricBox(
-                                  label: 'Qarz',
-                                  value: _formatMoney(order.debtAmount),
-                                  isDanger: order.debtAmount > 0,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            '${order.items.length} ta mahsulot • ${order.id.substring(0, 8)}',
-                            style: const TextStyle(
-                              color: Color(0xFF64748B),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                return _OrderCard(
+                  order: order,
+                  statusColor: _statusColor(order.status),
+                  formatMoney: _formatMoney,
+                  shortId: _shortId,
+                  onTap: () => context.go('/orders/${order.id}'),
                 );
               },
             ),
@@ -213,8 +135,173 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 }
 
-class _MetricBox extends StatelessWidget {
-  const _MetricBox({
+class _OrderCard extends StatelessWidget {
+  const _OrderCard({
+    required this.order,
+    required this.statusColor,
+    required this.formatMoney,
+    required this.shortId,
+    required this.onTap,
+  });
+
+  final OrderModel order;
+  final Color statusColor;
+  final String Function(num value) formatMoney;
+  final String Function(String value) shortId;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.storefront_rounded,
+                      color: Color(0xFF475569),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order.customer.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          order.customer.address ?? 'Manzil yo‘q',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _StatusPill(
+                    label: OrderStatusPolicy.label(order.status),
+                    color: statusColor,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MiniMetric(
+                      label: 'Jami',
+                      value: '${formatMoney(order.totalAmount)} so‘m',
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _MiniMetric(
+                      label: 'Qarz',
+                      value: '${formatMoney(order.debtAmount)} so‘m',
+                      isDanger: order.debtAmount > 0,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Text(
+                    '#${shortId(order.id)}',
+                    style: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${order.items.length} mahsulot',
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({
+    required this.label,
+    required this.color,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 112),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 9,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniMetric extends StatelessWidget {
+  const _MiniMetric({
     required this.label,
     required this.value,
     this.isDanger = false,
@@ -226,6 +313,8 @@ class _MetricBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = isDanger ? const Color(0xFFDC2626) : const Color(0xFF0F172A);
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -241,13 +330,16 @@ class _MetricBox extends StatelessWidget {
             style: const TextStyle(
               color: Color(0xFF64748B),
               fontSize: 12,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: isDanger ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+              color: color,
               fontWeight: FontWeight.w900,
             ),
           ),

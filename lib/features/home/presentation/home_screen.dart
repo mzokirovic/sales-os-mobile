@@ -32,15 +32,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = await _authRepository.readCurrentUser();
 
     if (user == null) {
-      throw const HomeException('Session topilmadi. Qayta login qiling.');
+      throw const HomeException('Session topilmadi');
     }
 
     final summary = await _dashboardRepository.getSummary();
 
-    return _HomeData(
-      user: user,
-      summary: summary,
-    );
+    return _HomeData(user: user, summary: summary);
   }
 
   void _reload() {
@@ -64,49 +61,27 @@ class _HomeScreenState extends State<HomeScreen> {
         )} so‘m';
   }
 
-  String _roleTitle(String role) {
+  String _roleName(String role) {
     return switch (role) {
-      'OWNER' => 'Direktor paneli',
-      'MANAGER' => 'Manager paneli',
-      'SALES' => 'Sotuvchi paneli',
-      'OPERATOR' => 'Operator paneli',
-      'WAREHOUSE' => 'Sklad paneli',
-      'DELIVERY' => 'Yetkazuvchi paneli',
-      _ => 'Sales OS',
+      'OWNER' => 'Direktor',
+      'MANAGER' => 'Manager',
+      'SALES' => 'Sotuvchi',
+      'OPERATOR' => 'Operator',
+      'WAREHOUSE' => 'Sklad',
+      'DELIVERY' => 'Yetkazuvchi',
+      _ => role,
     };
   }
 
-  String _roleTask(String role) {
+  String _roleFocus(String role) {
     return switch (role) {
-      'OWNER' => 'Savdo, qarz va zakaz oqimini nazorat qiling.',
-      'MANAGER' => 'Zakazlar oqimi va xodimlar ishini boshqaring.',
-      'SALES' => 'Mijozlar va o‘zingiz yaratgan zakazlar bilan ishlang.',
-      'OPERATOR' => 'Yangi zakazlarni tekshiring va tasdiqlang.',
-      'WAREHOUSE' => 'Tasdiqlangan zakazlarni tayyorlang va yo‘lga chiqaring.',
-      'DELIVERY' => 'Yo‘ldagi zakazlarni yetkazilgan holatga o‘tkazing.',
-      _ => 'Ish jarayonini davom ettiring.',
-    };
-  }
-
-  String _primaryActionLabel(String role) {
-    return switch (role) {
-      'SALES' => 'Mening zakazlarim',
-      'OPERATOR' => 'Tekshiriladigan zakazlar',
-      'WAREHOUSE' => 'Sklad zakazlari',
-      'DELIVERY' => 'Yetkazish zakazlari',
-      _ => 'Zakazlarni ko‘rish',
-    };
-  }
-
-  IconData _roleIcon(String role) {
-    return switch (role) {
-      'OWNER' => Icons.admin_panel_settings_rounded,
-      'MANAGER' => Icons.manage_accounts_rounded,
-      'SALES' => Icons.handshake_rounded,
-      'OPERATOR' => Icons.fact_check_rounded,
-      'WAREHOUSE' => Icons.warehouse_rounded,
-      'DELIVERY' => Icons.local_shipping_rounded,
-      _ => Icons.apps_rounded,
+      'OWNER' => 'Nazorat',
+      'MANAGER' => 'Boshqaruv',
+      'SALES' => 'Mijozlar',
+      'OPERATOR' => 'Tekshiruv',
+      'WAREHOUSE' => 'Sklad',
+      'DELIVERY' => 'Yetkazish',
+      _ => 'Ish paneli',
     };
   }
 
@@ -116,9 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
       future: _homeFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: LoadingView(),
-          );
+          return const Scaffold(body: LoadingView());
         }
 
         if (snapshot.hasError) {
@@ -145,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
           return Scaffold(
             appBar: AppBar(title: const Text('Sales OS')),
             body: ErrorView(
-              message: 'Home ma’lumoti topilmadi',
+              message: 'Ma’lumot topilmadi',
               onRetry: _reload,
             ),
           );
@@ -171,30 +144,24 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                _HeroHomeCard(
-                  title: _roleTitle(data.user.role),
-                  subtitle: _roleTask(data.user.role),
-                  icon: _roleIcon(data.user.role),
+                _CompactHeader(
                   user: data.user,
+                  roleName: _roleName(data.user.role),
+                  roleFocus: _roleFocus(data.user.role),
                 ),
-                const SizedBox(height: 14),
-                _DashboardMetrics(
+                const SizedBox(height: 12),
+                _MetricGrid(
                   summary: data.summary,
                   formatMoney: _formatMoney,
                 ),
-                const SizedBox(height: 14),
-                _PrimaryActionCard(
-                  label: _primaryActionLabel(data.user.role),
-                  description: 'Real serverdagi zakazlar ro‘yxatini ochish',
-                  icon: Icons.receipt_long_rounded,
+                const SizedBox(height: 12),
+                _MainActionCard(
                   onTap: () => context.go('/orders'),
                 ),
-                const SizedBox(height: 14),
-                _StatusBreakdownCard(
-                  summary: data.summary,
-                ),
-                const SizedBox(height: 14),
-                _RecentOrdersCard(
+                const SizedBox(height: 12),
+                _StatusRow(summary: data.summary),
+                const SizedBox(height: 12),
+                _RecentOrders(
                   summary: data.summary,
                   formatMoney: _formatMoney,
                 ),
@@ -226,26 +193,23 @@ class HomeException implements Exception {
   String toString() => message;
 }
 
-class _HeroHomeCard extends StatelessWidget {
-  const _HeroHomeCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
+class _CompactHeader extends StatelessWidget {
+  const _CompactHeader({
     required this.user,
+    required this.roleName,
+    required this.roleFocus,
   });
 
-  final String title;
-  final String subtitle;
-  final IconData icon;
   final CurrentUser user;
+  final String roleName;
+  final String roleFocus;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.all(18),
+        child: Row(
           children: [
             Container(
               width: 54,
@@ -254,52 +218,32 @@ class _HeroHomeCard extends StatelessWidget {
                 color: const Color(0xFF0F172A),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: Icon(
-                icon,
+              child: const Icon(
+                Icons.dashboard_rounded,
                 color: Colors.white,
-                size: 28,
               ),
             ),
-            const SizedBox(height: 18),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF0F172A),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontWeight: FontWeight.w600,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Row(
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.person_outline_rounded,
-                    color: Color(0xFF64748B),
+                  Text(
+                    roleName,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0F172A),
+                    ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      '${user.fullName} • ${user.role}',
-                      style: const TextStyle(
-                        color: Color(0xFF334155),
-                        fontWeight: FontWeight.w800,
-                      ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${user.fullName} • $roleFocus',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
@@ -312,8 +256,8 @@ class _HeroHomeCard extends StatelessWidget {
   }
 }
 
-class _DashboardMetrics extends StatelessWidget {
-  const _DashboardMetrics({
+class _MetricGrid extends StatelessWidget {
+  const _MetricGrid({
     required this.summary,
     required this.formatMoney,
   });
@@ -323,92 +267,80 @@ class _DashboardMetrics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      childAspectRatio: 1.35,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _MetricCard(
-                title: 'Savdo',
-                value: formatMoney(summary.totalSales),
-                icon: Icons.trending_up_rounded,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _MetricCard(
-                title: 'Ochiq qarz',
-                value: formatMoney(summary.openDebt),
-                icon: Icons.warning_amber_rounded,
-                isDanger: summary.openDebt > 0,
-              ),
-            ),
-          ],
+        _MetricTile(
+          label: 'Savdo',
+          value: formatMoney(summary.totalSales),
+          icon: Icons.trending_up_rounded,
         ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _MetricCard(
-                title: 'Zakazlar',
-                value: summary.ordersCount.toString(),
-                icon: Icons.receipt_long_rounded,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _MetricCard(
-                title: 'Mijozlar',
-                value: summary.customersCount.toString(),
-                icon: Icons.groups_rounded,
-              ),
-            ),
-          ],
+        _MetricTile(
+          label: 'Qarz',
+          value: formatMoney(summary.openDebt),
+          icon: Icons.warning_amber_rounded,
+          isDanger: summary.openDebt > 0,
+        ),
+        _MetricTile(
+          label: 'Zakaz',
+          value: summary.ordersCount.toString(),
+          icon: Icons.receipt_long_rounded,
+        ),
+        _MetricTile(
+          label: 'Mijoz',
+          value: summary.customersCount.toString(),
+          icon: Icons.groups_rounded,
         ),
       ],
     );
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.title,
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({
+    required this.label,
     required this.value,
     required this.icon,
     this.isDanger = false,
   });
 
-  final String title;
+  final String label;
   final String value;
   final IconData icon;
   final bool isDanger;
 
   @override
   Widget build(BuildContext context) {
+    final color = isDanger ? const Color(0xFFDC2626) : const Color(0xFF0F172A);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              icon,
-              color: isDanger ? const Color(0xFFDC2626) : const Color(0xFF475569),
-            ),
-            const SizedBox(height: 12),
+            Icon(icon, color: color),
+            const Spacer(),
             Text(
-              title,
+              label,
               style: const TextStyle(
                 color: Color(0xFF64748B),
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: isDanger ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+                color: color,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -419,17 +351,11 @@ class _MetricCard extends StatelessWidget {
   }
 }
 
-class _PrimaryActionCard extends StatelessWidget {
-  const _PrimaryActionCard({
-    required this.label,
-    required this.description,
-    required this.icon,
+class _MainActionCard extends StatelessWidget {
+  const _MainActionCard({
     required this.onTap,
   });
 
-  final String label;
-  final String description;
-  final IconData icon;
   final VoidCallback onTap;
 
   @override
@@ -438,49 +364,28 @@ class _PrimaryActionCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(18),
+        child: const Padding(
+          padding: EdgeInsets.all(18),
           child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  icon,
-                  color: const Color(0xFF2563EB),
-                ),
+              Icon(
+                Icons.receipt_long_rounded,
+                color: Color(0xFF2563EB),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      description,
-                      style: const TextStyle(
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'Zakazlar',
+                  style: TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.arrow_forward_ios_rounded,
-                size: 18,
+                size: 16,
                 color: Color(0xFF94A3B8),
               ),
             ],
@@ -491,8 +396,8 @@ class _PrimaryActionCard extends StatelessWidget {
   }
 }
 
-class _StatusBreakdownCard extends StatelessWidget {
-  const _StatusBreakdownCard({
+class _StatusRow extends StatelessWidget {
+  const _StatusRow({
     required this.summary,
   });
 
@@ -502,74 +407,33 @@ class _StatusBreakdownCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = summary.statusBreakdown;
 
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Statuslar',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF0F172A),
+        padding: const EdgeInsets.all(14),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: items.map((item) {
+            return Chip(
+              label: Text(
+                '${OrderStatusPolicy.label(item.status)} ${item.count}',
               ),
-            ),
-            const SizedBox(height: 12),
-            if (items.isEmpty)
-              const Text(
-                'Status statistikasi hali yo‘q',
-                style: TextStyle(
-                  color: Color(0xFF64748B),
-                  fontWeight: FontWeight.w600,
-                ),
-              )
-            else
-              ...items.map((item) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          OrderStatusPolicy.label(item.status),
-                          style: const TextStyle(
-                            color: Color(0xFF334155),
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          item.count.toString(),
-                          style: const TextStyle(
-                            color: Color(0xFF0F172A),
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-          ],
+              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              backgroundColor: const Color(0xFFF8FAFC),
+            );
+          }).toList(),
         ),
       ),
     );
   }
 }
 
-class _RecentOrdersCard extends StatelessWidget {
-  const _RecentOrdersCard({
+class _RecentOrders extends StatelessWidget {
+  const _RecentOrders({
     required this.summary,
     required this.formatMoney,
   });
@@ -581,83 +445,57 @@ class _RecentOrdersCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final orders = summary.recentOrders;
 
+    if (orders.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'So‘nggi zakazlar',
+              'So‘nggi',
               style: TextStyle(
+                color: Color(0xFF0F172A),
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
-                color: Color(0xFF0F172A),
               ),
             ),
-            const SizedBox(height: 12),
-            if (orders.isEmpty)
-              const Text(
-                'Hozircha zakazlar yo‘q',
-                style: TextStyle(
-                  color: Color(0xFF64748B),
-                  fontWeight: FontWeight.w600,
-                ),
-              )
-            else
-              ...orders.map((order) {
-                return InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () => context.go('/orders/${order.id}'),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Icon(
-                            Icons.receipt_long_rounded,
-                            color: Color(0xFF475569),
+            const SizedBox(height: 8),
+            ...orders.map((order) {
+              return InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => context.go('/orders/${order.id}'),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          order.customer.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                order.customer.name,
-                                style: const TextStyle(
-                                  color: Color(0xFF0F172A),
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${OrderStatusPolicy.label(order.status)} • ${formatMoney(order.totalAmount)}',
-                                style: const TextStyle(
-                                  color: Color(0xFF64748B),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        formatMoney(order.totalAmount),
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w800,
                         ),
-                        const Icon(
-                          Icons.arrow_forward_ios_rounded,
-                          size: 16,
-                          color: Color(0xFF94A3B8),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                );
-              }),
+                ),
+              );
+            }),
           ],
         ),
       ),
