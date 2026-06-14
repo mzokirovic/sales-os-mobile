@@ -17,6 +17,29 @@ class CustomersRepository {
         .map((item) => CustomerModel.fromJson(item as Map<String, dynamic>))
         .toList();
   }
+
+  Future<CustomerModel> createCustomer({
+    required String name,
+    String? phone,
+    String? address,
+    String? note,
+  }) async {
+    final result = await _apiClient.post(
+      '/customers',
+      body: {
+        'name': name,
+        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        if (address != null && address.trim().isNotEmpty) 'address': address.trim(),
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      },
+    );
+
+    if (result is! Map<String, dynamic>) {
+      throw const CustomersException('Mijoz yaratish javobi noto‘g‘ri formatda keldi');
+    }
+
+    return CustomerModel.fromJson(result);
+  }
 }
 
 class CustomersException implements Exception {

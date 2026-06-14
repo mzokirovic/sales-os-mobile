@@ -196,10 +196,29 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
               children: [
                 _FormCard(
                   children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Mijoz',
+                            style: TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => context.go('/customers/create'),
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('Yangi'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
                       initialValue: _selectedCustomerId,
                       decoration: const InputDecoration(
-                        labelText: 'Mijoz',
+                        labelText: 'Tanlang',
                         prefixIcon: Icon(Icons.storefront_rounded),
                       ),
                       items: data.customers.map((customer) {
