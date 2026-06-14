@@ -8,6 +8,11 @@ import 'order_models.dart';
 import 'order_status_policy.dart';
 import 'orders_repository.dart';
 
+enum OrdersFilter {
+  active,
+  closed,
+}
+
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
 
@@ -20,6 +25,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   final _authRepository = AuthRepository();
 
   late Future<List<OrderModel>> _ordersFuture;
+  OrdersFilter _filter = OrdersFilter.active;
 
   @override
   void initState() {
@@ -39,6 +45,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
     if (!mounted) return;
 
     context.go('/login');
+  }
+
+  List<OrderModel> _applyFilter(List<OrderModel> orders) {
+    return switch (_filter) {
+      OrdersFilter.active => orders.where((order) => order.status != 'PAID').toList(),
+      OrdersFilter.closed => orders.where((order) => order.status == 'PAID').toList(),
+    };
+  }
+
+  String _emptyMessage() {
+    return switch (_filter) {
+      OrdersFilter.active => 'Aktiv zakaz yo‘q',
+      OrdersFilter.closed => 'Yopilgan zakaz yo‘q',
+    };
   }
 
   String _formatMoney(num value) {
@@ -101,35 +121,201 @@ class _OrdersScreenState extends State<OrdersScreen> {
             );
           }
 
-          final orders = snapshot.data ?? [];
-
-          if (orders.isEmpty) {
-            return ErrorView(
-              message: 'Zakazlar yo‘q',
-              onRetry: _reload,
-            );
-          }
+          final allOrders = snapshot.data ?? [];
+          final activeCount = allOrders.where((order) => order.status != 'PAID').length;
+          final closedCount = allOrders.where((order) => order.status == 'PAID').length;
+          final visibleOrders = _applyFilter(allOrders);
 
           return RefreshIndicator(
             onRefresh: () async => _reload(),
-            child: ListView.separated(
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
-              itemCount: orders.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final order = orders[index];
-
-                return _OrderCard(
-                  order: order,
-                  statusColor: _statusColor(order.status),
-                  formatMoney: _formatMoney,
-                  shortId: _shortId,
-                  onTap: () => context.go('/orders/${order.id}'),
-                );
-              },
+              children: [
+                _ModernFilterTabs(
+                  selected: _filter,
+                  activeCount: activeCount,
+                  closedCount: closedCount,
+                  onChanged: (filter) {
+                    setState(() {
+                      _filter = filter;
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                if (visibleOrders.isEmpty)
+                  _EmptyOrdersCard(message: _emptyMessage())
+                else
+                  ...visibleOrders.map((order) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _OrderCard(
+                        order: order,
+                        statusColor: _statusColor(order.status),
+                        formatMoney: _formatMoney,
+                        shortId: _shortId,
+                        onTap: () => context.go('/orders/${order.id}'),
+                      ),
+                    );
+                  }),
+              ],
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _ModernFilterTabs extends StatelessWidget {
+  const _ModernFilterTabs({
+    required this.selected,
+    required this.activeCount,
+    required this.closedCount,
+    required this.onChanged,
+  });
+
+  final OrdersFilter selected;
+  final int activeCount;
+  final int closedCount;
+  final ValueChanged<OrdersFilter> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Row(
+          children: [
+            Expanded(
+              child: _FilterTab(
+                label: 'Aktiv',
+                count: activeCount,
+                isSelected: selected == OrdersFilter.active,
+                onTap: () => onChanged(OrdersFilter.active),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _FilterTab(
+                label: 'Yopilgan',
+                count: closedCount,
+                isSelected: selected == OrdersFilter.closed,
+                onTap: () => onChanged(OrdersFilter.closed),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterTab extends StatelessWidget {
+  const _FilterTab({
+    required this.label,
+    required this.count,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundColor = isSelected ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final textColor = isSelected ? Colors.white : const Color(0xFF475569);
+    final badgeColor = isSelected ? Colors.white.withValues(alpha: 0.16) : Colors.white;
+    final badgeTextColor = isSelected ? Colors.white : const Color(0xFF0F172A);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: badgeColor,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: isSelected ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Text(
+                count.toString(),
+                style: TextStyle(
+                  color: badgeTextColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyOrdersCard extends StatelessWidget {
+  const _EmptyOrdersCard({
+    required this.message,
+  });
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.inbox_outlined,
+              color: Color(0xFF64748B),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Color(0xFF475569),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

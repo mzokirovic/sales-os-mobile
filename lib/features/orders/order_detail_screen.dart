@@ -38,10 +38,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final order = await _ordersRepository.getOrder(widget.orderId);
     final user = await _authRepository.readCurrentUser();
 
-    return _OrderDetailData(
-      order: order,
-      user: user,
-    );
+    return _OrderDetailData(order: order, user: user);
   }
 
   void _reload() {
@@ -158,7 +155,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             );
           }
 
-          return _OrderDetailContent(
+          return _CompactOrderDetail(
             order: data.order,
             role: data.user?.role ?? 'UNKNOWN',
             statusColor: _statusColor(data.order.status),
@@ -182,7 +179,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             currentStatus: data.order.status,
           );
 
-          return _BottomStatusAction(
+          return _BottomActionBar(
             role: role,
             nextStatus: nextStatus,
             isUpdatingStatus: _isUpdatingStatus,
@@ -209,8 +206,8 @@ class _OrderDetailData {
   final CurrentUser? user;
 }
 
-class _OrderDetailContent extends StatelessWidget {
-  const _OrderDetailContent({
+class _CompactOrderDetail extends StatelessWidget {
+  const _CompactOrderDetail({
     required this.order,
     required this.role,
     required this.statusColor,
@@ -227,50 +224,45 @@ class _OrderDetailContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 130),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
       children: [
-        _HeroOrderCard(
+        _CustomerCard(
           order: order,
           role: role,
           statusColor: statusColor,
-          formatMoney: formatMoney,
+          shortId: shortId,
         ),
-        const SizedBox(height: 14),
-        _StatusTimeline(
-          currentStatus: order.status,
-        ),
-        const SizedBox(height: 14),
-        _ProductsCard(
+        const SizedBox(height: 12),
+        _MoneySummary(
           order: order,
           formatMoney: formatMoney,
         ),
-        const SizedBox(height: 14),
-        Text(
-          'ID: ${shortId(order.id)}',
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Color(0xFF94A3B8),
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
+        const SizedBox(height: 12),
+        _MiniStatusFlow(
+          currentStatus: order.status,
+        ),
+        const SizedBox(height: 12),
+        _ProductsCard(
+          order: order,
+          formatMoney: formatMoney,
         ),
       ],
     );
   }
 }
 
-class _HeroOrderCard extends StatelessWidget {
-  const _HeroOrderCard({
+class _CustomerCard extends StatelessWidget {
+  const _CustomerCard({
     required this.order,
     required this.role,
     required this.statusColor,
-    required this.formatMoney,
+    required this.shortId,
   });
 
   final OrderModel order;
   final String role;
   final Color statusColor;
-  final String Function(num value) formatMoney;
+  final String Function(String value) shortId;
 
   @override
   Widget build(BuildContext context) {
@@ -281,93 +273,43 @@ class _HeroOrderCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Text(
                     order.customer.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
+                      color: Color(0xFF0F172A),
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF0F172A),
                     ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    OrderStatusPolicy.label(order.status),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                const Icon(
-                  Icons.person_outline_rounded,
-                  size: 18,
-                  color: Color(0xFF64748B),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  role,
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              order.customer.phone ?? 'Telefon kiritilmagan',
-              style: const TextStyle(
-                color: Color(0xFF334155),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              order.customer.address ?? 'Manzil kiritilmagan',
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: _MetricCard(
-                    label: 'Jami',
-                    value: formatMoney(order.totalAmount),
                   ),
                 ),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: _MetricCard(
-                    label: 'To‘langan',
-                    value: formatMoney(order.paidAmount),
-                  ),
+                _StatusChip(
+                  label: OrderStatusPolicy.label(order.status),
+                  color: statusColor,
                 ),
               ],
             ),
             const SizedBox(height: 10),
-            _MetricCard(
-              label: 'Qarz',
-              value: formatMoney(order.debtAmount),
-              isDanger: order.debtAmount > 0,
+            _TinyInfo(
+              icon: Icons.location_on_outlined,
+              text: order.customer.address ?? 'Manzil yo‘q',
+            ),
+            const SizedBox(height: 6),
+            _TinyInfo(
+              icon: Icons.phone_outlined,
+              text: order.customer.phone ?? 'Telefon yo‘q',
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _SmallPill(text: role),
+                const SizedBox(width: 8),
+                _SmallPill(text: '#${shortId(order.id)}'),
+              ],
             ),
           ],
         ),
@@ -376,8 +318,50 @@ class _HeroOrderCard extends StatelessWidget {
   }
 }
 
-class _StatusTimeline extends StatelessWidget {
-  const _StatusTimeline({
+class _MoneySummary extends StatelessWidget {
+  const _MoneySummary({
+    required this.order,
+    required this.formatMoney,
+  });
+
+  final OrderModel order;
+  final String Function(num value) formatMoney;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _WideMetric(
+          label: 'Jami',
+          value: formatMoney(order.totalAmount),
+          icon: Icons.payments_outlined,
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _SmallMetric(
+                label: 'To‘langan',
+                value: formatMoney(order.paidAmount),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _SmallMetric(
+                label: 'Qarz',
+                value: formatMoney(order.debtAmount),
+                isDanger: order.debtAmount > 0,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniStatusFlow extends StatelessWidget {
+  const _MiniStatusFlow({
     required this.currentStatus,
   });
 
@@ -399,101 +383,69 @@ class _StatusTimeline extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Status yo‘li',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF0F172A),
-              ),
-            ),
-            const SizedBox(height: 14),
-            ..._steps.asMap().entries.map((entry) {
-              final index = entry.key;
-              final status = entry.value;
-              final isDone = currentIndex >= index;
-              final isCurrent = currentIndex == index;
-              final isLast = index == _steps.length - 1;
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: _steps.asMap().entries.map((entry) {
+            final index = entry.key;
+            final status = entry.value;
+            final isDone = currentIndex >= index;
+            final isCurrent = currentIndex == index;
 
-              return _TimelineStep(
+            return Expanded(
+              child: _StatusDot(
                 label: OrderStatusPolicy.label(status),
                 isDone: isDone,
                 isCurrent: isCurrent,
-                isLast: isLast,
-              );
-            }),
-          ],
+              ),
+            );
+          }).toList(),
         ),
       ),
     );
   }
 }
 
-class _TimelineStep extends StatelessWidget {
-  const _TimelineStep({
+class _StatusDot extends StatelessWidget {
+  const _StatusDot({
     required this.label,
     required this.isDone,
     required this.isCurrent,
-    required this.isLast,
   });
 
   final String label;
   final bool isDone;
   final bool isCurrent;
-  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
-    final circleColor = isDone ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0);
-    final textColor = isDone ? const Color(0xFF0F172A) : const Color(0xFF94A3B8);
+    final color = isDone ? const Color(0xFF0F172A) : const Color(0xFFCBD5E1);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Column(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: circleColor,
-                borderRadius: BorderRadius.circular(999),
-                border: isCurrent
-                    ? Border.all(
-                        color: const Color(0xFF2563EB),
-                        width: 3,
-                      )
-                    : null,
-              ),
-              child: Icon(
-                isDone ? Icons.check_rounded : Icons.circle,
-                size: isDone ? 18 : 8,
-                color: isDone ? Colors.white : const Color(0xFFCBD5E1),
-              ),
-            ),
-            if (!isLast)
-              Container(
-                width: 2,
-                height: 24,
-                color: isDone ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0),
-              ),
-          ],
+        Container(
+          width: isCurrent ? 18 : 12,
+          height: isCurrent ? 18 : 12,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: isCurrent
+                ? Border.all(
+                    color: const Color(0xFF2563EB),
+                    width: 3,
+                  )
+                : null,
+          ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: textColor,
-                fontWeight: isCurrent ? FontWeight.w900 : FontWeight.w700,
-              ),
-            ),
+        const SizedBox(height: 6),
+        Text(
+          label.split(' ').first,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: isCurrent ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+            fontSize: 10,
+            fontWeight: isCurrent ? FontWeight.w900 : FontWeight.w700,
           ),
         ),
       ],
@@ -514,65 +466,53 @@ class _ProductsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Mahsulotlar',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF0F172A),
-              ),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Mahsulotlar',
+                    style: TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  order.items.length.toString(),
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             ...order.items.map((item) {
               return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(
-                        Icons.inventory_2_outlined,
-                        color: Color(0xFF475569),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.productName,
-                            style: const TextStyle(
-                              color: Color(0xFF0F172A),
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${item.quantity} dona × ${formatMoney(item.price)}',
-                            style: const TextStyle(
-                              color: Color(0xFF64748B),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        item.productName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
-                      formatMoney(item.total),
+                      '${item.quantity} × ${formatMoney(item.price)}',
                       style: const TextStyle(
-                        color: Color(0xFF0F172A),
-                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -586,8 +526,8 @@ class _ProductsCard extends StatelessWidget {
   }
 }
 
-class _BottomStatusAction extends StatelessWidget {
-  const _BottomStatusAction({
+class _BottomActionBar extends StatelessWidget {
+  const _BottomActionBar({
     required this.role,
     required this.nextStatus,
     required this.isUpdatingStatus,
@@ -604,7 +544,7 @@ class _BottomStatusAction extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
         decoration: const BoxDecoration(
           color: Colors.white,
           border: Border(
@@ -614,7 +554,7 @@ class _BottomStatusAction extends StatelessWidget {
         child: nextStatus == null
             ? _LockedAction(role: role)
             : SizedBox(
-                height: 54,
+                height: 52,
                 child: FilledButton(
                   onPressed: isUpdatingStatus ? null : onMoveNext,
                   child: isUpdatingStatus
@@ -641,7 +581,7 @@ class _LockedAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 54,
+      height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
@@ -657,9 +597,9 @@ class _LockedAction extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              role == 'SALES'
-                  ? 'Sotuvchi statusni o‘zgartirmaydi'
-                  : 'Bu bosqichda siz uchun action yo‘q',
+              role == 'SALES' ? 'Status action yo‘q' : 'Bu bosqichda action yo‘q',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Color(0xFF475569),
                 fontWeight: FontWeight.w800,
@@ -672,8 +612,141 @@ class _LockedAction extends StatelessWidget {
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({
+    required this.label,
+    required this.color,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 118),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _TinyInfo extends StatelessWidget {
+  const _TinyInfo({
+    required this.icon,
+    required this.text,
+  });
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 17, color: const Color(0xFF64748B)),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SmallPill extends StatelessWidget {
+  const _SmallPill({
+    required this.text,
+  });
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Color(0xFF475569),
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _WideMetric extends StatelessWidget {
+  const _WideMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(icon, color: const Color(0xFF0F172A)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SmallMetric extends StatelessWidget {
+  const _SmallMetric({
     required this.label,
     required this.value,
     this.isDanger = false,
@@ -685,34 +758,34 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF64748B),
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+    final color = isDanger ? const Color(0xFFDC2626) : const Color(0xFF0F172A);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            value,
-            style: TextStyle(
-              color: isDanger ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
-              fontWeight: FontWeight.w900,
+            const SizedBox(height: 4),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
