@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../auth/data/auth_repository.dart';
 import '../../../core/auth/current_user.dart';
+import '../../../shared/widgets/error_view.dart';
 import '../../../shared/widgets/loading_view.dart';
+import '../../auth/data/auth_repository.dart';
+import '../../dashboard/dashboard_model.dart';
+import '../../dashboard/dashboard_repository.dart';
+import '../../orders/order_status_policy.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,13 +18,35 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _authRepository = AuthRepository();
+  final _dashboardRepository = DashboardRepository();
 
-  late Future<CurrentUser?> _userFuture;
+  late Future<_HomeData> _homeFuture;
 
   @override
   void initState() {
     super.initState();
-    _userFuture = _authRepository.readCurrentUser();
+    _homeFuture = _loadHome();
+  }
+
+  Future<_HomeData> _loadHome() async {
+    final user = await _authRepository.readCurrentUser();
+
+    if (user == null) {
+      throw const HomeException('Session topilmadi. Qayta login qiling.');
+    }
+
+    final summary = await _dashboardRepository.getSummary();
+
+    return _HomeData(
+      user: user,
+      summary: summary,
+    );
+  }
+
+  void _reload() {
+    setState(() {
+      _homeFuture = _loadHome();
+    });
   }
 
   Future<void> _logout() async {
@@ -29,6 +55,13 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
 
     context.go('/login');
+  }
+
+  String _formatMoney(num value) {
+    return '${value.toInt().toString().replaceAllMapped(
+          RegExp(r'\B(?=(\d{3})+(?!\d))'),
+          (match) => ' ',
+        )} so‘m';
   }
 
   String _roleTitle(String role) {
@@ -45,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _roleTask(String role) {
     return switch (role) {
-      'OWNER' => 'Bugungi zakazlar, qarzlar va ish jarayonini nazorat qiling.',
+      'OWNER' => 'Savdo, qarz va zakaz oqimini nazorat qiling.',
       'MANAGER' => 'Zakazlar oqimi va xodimlar ishini boshqaring.',
       'SALES' => 'Mijozlar va o‘zingiz yaratgan zakazlar bilan ishlang.',
       'OPERATOR' => 'Yangi zakazlarni tekshiring va tasdiqlang.',
@@ -79,8 +112,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<CurrentUser?>(
-      future: _userFuture,
+    return FutureBuilder<_HomeData>(
+      future: _homeFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -88,17 +121,33 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
 
-        final user = snapshot.data;
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Sales OS'),
+              actions: [
+                IconButton(
+                  onPressed: _logout,
+                  icon: const Icon(Icons.logout_rounded),
+                ),
+              ],
+            ),
+            body: ErrorView(
+              message: snapshot.error.toString(),
+              onRetry: _reload,
+            ),
+          );
+        }
 
-        if (user == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) {
-              context.go('/login');
-            }
-          });
+        final data = snapshot.data;
 
-          return const Scaffold(
-            body: LoadingView(),
+        if (data == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Sales OS')),
+            body: ErrorView(
+              message: 'Home ma’lumoti topilmadi',
+              onRetry: _reload,
+            ),
           );
         }
 
@@ -108,37 +157,73 @@ class _HomeScreenState extends State<HomeScreen> {
             title: const Text('Sales OS'),
             actions: [
               IconButton(
+                onPressed: _reload,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+              IconButton(
                 onPressed: _logout,
                 icon: const Icon(Icons.logout_rounded),
               ),
             ],
           ),
-          body: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _HeroHomeCard(
-                title: _roleTitle(user.role),
-                subtitle: _roleTask(user.role),
-                icon: _roleIcon(user.role),
-                user: user,
-              ),
-              const SizedBox(height: 14),
-              _PrimaryActionCard(
-                label: _primaryActionLabel(user.role),
-                description: 'Real serverdagi zakazlar ro‘yxatini ochish',
-                icon: Icons.receipt_long_rounded,
-                onTap: () => context.go('/orders'),
-              ),
-              const SizedBox(height: 14),
-              _InfoGrid(
-                role: user.role,
-              ),
-            ],
+          body: RefreshIndicator(
+            onRefresh: () async => _reload(),
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _HeroHomeCard(
+                  title: _roleTitle(data.user.role),
+                  subtitle: _roleTask(data.user.role),
+                  icon: _roleIcon(data.user.role),
+                  user: data.user,
+                ),
+                const SizedBox(height: 14),
+                _DashboardMetrics(
+                  summary: data.summary,
+                  formatMoney: _formatMoney,
+                ),
+                const SizedBox(height: 14),
+                _PrimaryActionCard(
+                  label: _primaryActionLabel(data.user.role),
+                  description: 'Real serverdagi zakazlar ro‘yxatini ochish',
+                  icon: Icons.receipt_long_rounded,
+                  onTap: () => context.go('/orders'),
+                ),
+                const SizedBox(height: 14),
+                _StatusBreakdownCard(
+                  summary: data.summary,
+                ),
+                const SizedBox(height: 14),
+                _RecentOrdersCard(
+                  summary: data.summary,
+                  formatMoney: _formatMoney,
+                ),
+              ],
+            ),
           ),
         );
       },
     );
   }
+}
+
+class _HomeData {
+  const _HomeData({
+    required this.user,
+    required this.summary,
+  });
+
+  final CurrentUser user;
+  final DashboardSummary summary;
+}
+
+class HomeException implements Exception {
+  const HomeException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 class _HeroHomeCard extends StatelessWidget {
@@ -227,6 +312,113 @@ class _HeroHomeCard extends StatelessWidget {
   }
 }
 
+class _DashboardMetrics extends StatelessWidget {
+  const _DashboardMetrics({
+    required this.summary,
+    required this.formatMoney,
+  });
+
+  final DashboardSummary summary;
+  final String Function(num value) formatMoney;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _MetricCard(
+                title: 'Savdo',
+                value: formatMoney(summary.totalSales),
+                icon: Icons.trending_up_rounded,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _MetricCard(
+                title: 'Ochiq qarz',
+                value: formatMoney(summary.openDebt),
+                icon: Icons.warning_amber_rounded,
+                isDanger: summary.openDebt > 0,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _MetricCard(
+                title: 'Zakazlar',
+                value: summary.ordersCount.toString(),
+                icon: Icons.receipt_long_rounded,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _MetricCard(
+                title: 'Mijozlar',
+                value: summary.customersCount.toString(),
+                icon: Icons.groups_rounded,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    this.isDanger = false,
+  });
+
+  final String title;
+  final String value;
+  final IconData icon;
+  final bool isDanger;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              icon,
+              color: isDanger ? const Color(0xFFDC2626) : const Color(0xFF475569),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                color: isDanger ? const Color(0xFFDC2626) : const Color(0xFF0F172A),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PrimaryActionCard extends StatelessWidget {
   const _PrimaryActionCard({
     required this.label,
@@ -299,77 +491,173 @@ class _PrimaryActionCard extends StatelessWidget {
   }
 }
 
-class _InfoGrid extends StatelessWidget {
-  const _InfoGrid({
-    required this.role,
+class _StatusBreakdownCard extends StatelessWidget {
+  const _StatusBreakdownCard({
+    required this.summary,
   });
 
-  final String role;
+  final DashboardSummary summary;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _MiniInfoCard(
-            title: 'Server',
-            value: 'Render',
-            icon: Icons.cloud_done_rounded,
-          ),
+    final items = summary.statusBreakdown;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Statuslar',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (items.isEmpty)
+              const Text(
+                'Status statistikasi hali yo‘q',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                ),
+              )
+            else
+              ...items.map((item) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          OrderStatusPolicy.label(item.status),
+                          style: const TextStyle(
+                            color: Color(0xFF334155),
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          item.count.toString(),
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+          ],
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _MiniInfoCard(
-            title: 'Role',
-            value: role,
-            icon: Icons.verified_user_rounded,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _MiniInfoCard extends StatelessWidget {
-  const _MiniInfoCard({
-    required this.title,
-    required this.value,
-    required this.icon,
+class _RecentOrdersCard extends StatelessWidget {
+  const _RecentOrdersCard({
+    required this.summary,
+    required this.formatMoney,
   });
 
-  final String title;
-  final String value;
-  final IconData icon;
+  final DashboardSummary summary;
+  final String Function(num value) formatMoney;
 
   @override
   Widget build(BuildContext context) {
+    final orders = summary.recentOrders;
+
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              icon,
-              color: const Color(0xFF475569),
+            const Text(
+              'So‘nggi zakazlar',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF0F172A),
+              ),
             ),
             const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: const TextStyle(
-                color: Color(0xFF0F172A),
-                fontWeight: FontWeight.w900,
-              ),
-            ),
+            if (orders.isEmpty)
+              const Text(
+                'Hozircha zakazlar yo‘q',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                ),
+              )
+            else
+              ...orders.map((order) {
+                return InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => context.go('/orders/${order.id}'),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            Icons.receipt_long_rounded,
+                            color: Color(0xFF475569),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                order.customer.name,
+                                style: const TextStyle(
+                                  color: Color(0xFF0F172A),
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${OrderStatusPolicy.label(order.status)} • ${formatMoney(order.totalAmount)}',
+                                style: const TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 16,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
           ],
         ),
       ),
