@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../shared/widgets/error_view.dart';
 import '../../shared/widgets/loading_view.dart';
+import '../../core/auth/current_user.dart';
 import 'order_models.dart';
+import 'order_permission_policy.dart';
 import 'order_status_policy.dart';
 import 'orders_repository.dart';
 
@@ -25,17 +27,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
   final _authRepository = AuthRepository();
 
   late Future<List<OrderModel>> _ordersFuture;
+  late Future<CurrentUser?> _currentUserFuture;
   OrdersFilter _filter = OrdersFilter.active;
 
   @override
   void initState() {
     super.initState();
     _ordersFuture = _ordersRepository.listOrders();
+    _currentUserFuture = _authRepository.readCurrentUser();
   }
 
   void _reload() {
     setState(() {
       _ordersFuture = _ordersRepository.listOrders();
+      _currentUserFuture = _authRepository.readCurrentUser();
     });
   }
 
@@ -106,6 +111,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
             icon: const Icon(Icons.logout_rounded),
           ),
         ],
+      ),
+      floatingActionButton: FutureBuilder<CurrentUser?>(
+        future: _currentUserFuture,
+        builder: (context, snapshot) {
+          final role = snapshot.data?.role;
+
+          if (role == null || !OrderPermissionPolicy.canCreateOrder(role)) {
+            return const SizedBox.shrink();
+          }
+
+          return FloatingActionButton.extended(
+            onPressed: () => context.go('/orders/create'),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Yangi'),
+          );
+        },
       ),
       body: FutureBuilder<List<OrderModel>>(
         future: _ordersFuture,

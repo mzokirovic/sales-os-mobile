@@ -28,6 +28,33 @@ class OrdersRepository {
     return OrderModel.fromJson(result);
   }
 
+  Future<OrderModel> createOrder({
+    required String customerId,
+    required String productId,
+    required int quantity,
+    required num paidAmount,
+  }) async {
+    final result = await _apiClient.post(
+      '/orders',
+      body: {
+        'customerId': customerId,
+        'items': [
+          {
+            'productId': productId,
+            'quantity': quantity,
+          },
+        ],
+        'paidAmount': paidAmount,
+      },
+    );
+
+    if (result is! Map<String, dynamic>) {
+      throw const OrdersException('Zakaz yaratish javobi noto‘g‘ri formatda keldi');
+    }
+
+    return OrderModel.fromJson(result);
+  }
+
   Future<OrderModel> updateStatus({
     required String orderId,
     required String status,
