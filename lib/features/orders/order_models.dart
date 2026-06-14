@@ -53,6 +53,26 @@ class OrderItem {
   }
 }
 
+class OrderPayment {
+  const OrderPayment({
+    required this.id,
+    required this.amount,
+    this.paymentMethod,
+  });
+
+  final String id;
+  final num amount;
+  final String? paymentMethod;
+
+  factory OrderPayment.fromJson(Map<String, dynamic> json) {
+    return OrderPayment(
+      id: json['id'] as String,
+      amount: json['amount'] as num,
+      paymentMethod: json['paymentMethod'] as String?,
+    );
+  }
+}
+
 class OrderModel {
   const OrderModel({
     required this.id,
@@ -62,6 +82,7 @@ class OrderModel {
     required this.createdAt,
     required this.customer,
     required this.items,
+    required this.payments,
   });
 
   final String id;
@@ -71,9 +92,15 @@ class OrderModel {
   final DateTime createdAt;
   final OrderCustomer customer;
   final List<OrderItem> items;
+  final List<OrderPayment> payments;
+
+  num get paidAmount {
+    return payments.fold<num>(0, (sum, payment) => sum + payment.amount);
+  }
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     final itemsJson = json['items'] as List<dynamic>? ?? [];
+    final paymentsJson = json['payments'] as List<dynamic>? ?? [];
 
     return OrderModel(
       id: json['id'] as String,
@@ -84,6 +111,9 @@ class OrderModel {
       customer: OrderCustomer.fromJson(json['customer'] as Map<String, dynamic>),
       items: itemsJson
           .map((item) => OrderItem.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      payments: paymentsJson
+          .map((payment) => OrderPayment.fromJson(payment as Map<String, dynamic>))
           .toList(),
     );
   }

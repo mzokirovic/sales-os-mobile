@@ -17,6 +17,34 @@ class OrdersRepository {
         .map((item) => OrderModel.fromJson(item as Map<String, dynamic>))
         .toList();
   }
+
+  Future<OrderModel> getOrder(String orderId) async {
+    final result = await _apiClient.get('/orders/$orderId');
+
+    if (result is! Map<String, dynamic>) {
+      throw const OrdersException('Zakaz detail noto‘g‘ri formatda keldi');
+    }
+
+    return OrderModel.fromJson(result);
+  }
+
+  Future<OrderModel> updateStatus({
+    required String orderId,
+    required String status,
+  }) async {
+    final result = await _apiClient.patch(
+      '/orders/$orderId/status',
+      body: {
+        'status': status,
+      },
+    );
+
+    if (result is! Map<String, dynamic>) {
+      throw const OrdersException('Status javobi noto‘g‘ri formatda keldi');
+    }
+
+    return OrderModel.fromJson(result);
+  }
 }
 
 class OrdersException implements Exception {
