@@ -176,6 +176,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     const SizedBox(height: 12),
                     _StatusFlowCard(order: data.order),
                     const SizedBox(height: 12),
+                    _RoleHintCard(
+                      role: data.user?.role,
+                      order: data.order,
+                      nextStatus: nextStatus,
+                      actionText: nextStatus == null ? null : _actionText(nextStatus),
+                    ),
+                    const SizedBox(height: 12),
                     _ProductsCard(
                       items: data.order.items,
                       formatMoney: _formatMoney,
@@ -542,6 +549,112 @@ class _StatusStep extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+
+class _RoleHintCard extends StatelessWidget {
+  const _RoleHintCard({
+    required this.role,
+    required this.order,
+    required this.nextStatus,
+    required this.actionText,
+  });
+
+  final String? role;
+  final OrderModel order;
+  final String? nextStatus;
+  final String? actionText;
+
+  bool get _isDone => order.status == 'PAID';
+
+  String get _title {
+    if (_isDone) return 'Zakaz yakunlangan';
+    if (nextStatus != null && actionText != null) return 'Keyingi amal: $actionText';
+    return 'Bu bosqich sizning rolingiz uchun emas';
+  }
+
+  String get _subtitle {
+    if (_isDone) {
+      return 'Bu zakaz bo‘yicha status flow tugagan.';
+    }
+
+    if (nextStatus != null) {
+      return 'Role: ${role ?? 'Noma’lum'} • Hozirgi status: ${OrderStatusPolicy.label(order.status)}';
+    }
+
+    return 'Role: ${role ?? 'Noma’lum'} • Siz hozir bu statusni o‘zgartira olmaysiz.';
+  }
+
+  IconData get _icon {
+    if (_isDone) return Icons.verified_rounded;
+    if (nextStatus != null) return Icons.play_circle_rounded;
+    return Icons.info_outline_rounded;
+  }
+
+  Color get _color {
+    if (_isDone) return const Color(0xFF16A34A);
+    if (nextStatus != null) return const Color(0xFF2563EB);
+    return const Color(0xFFF59E0B);
+  }
+
+  Color get _background {
+    if (_isDone) return const Color(0xFFF0FDF4);
+    if (nextStatus != null) return const Color(0xFFEFF6FF);
+    return const Color(0xFFFFFBEB);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: _background,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                _icon,
+                color: _color,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _title,
+                    style: TextStyle(
+                      color: _color,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
