@@ -159,6 +159,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   onTap: () => context.go('/orders'),
                 ),
                 const SizedBox(height: 12),
+                _CustomersActionCard(
+                  onTap: () => context.go('/customers'),
+                ),
+                const SizedBox(height: 12),
                 _StatusRow(summary: data.summary),
                 const SizedBox(height: 12),
                 _RecentOrders(
@@ -376,6 +380,52 @@ class _MainActionCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Zakazlar',
+                  style: TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+                color: Color(0xFF94A3B8),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+class _CustomersActionCard extends StatelessWidget {
+  const _CustomersActionCard({
+    required this.onTap,
+  });
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Icon(
+                Icons.groups_rounded,
+                color: Color(0xFF2563EB),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Mijozlar',
                   style: TextStyle(
                     color: Color(0xFF0F172A),
                     fontSize: 18,

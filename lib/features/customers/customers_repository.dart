@@ -18,6 +18,16 @@ class CustomersRepository {
         .toList();
   }
 
+  Future<CustomerModel> getCustomer(String customerId) async {
+    final result = await _apiClient.get('/customers/$customerId');
+
+    if (result is! Map<String, dynamic>) {
+      throw const CustomersException('Mijoz detail noto‘g‘ri formatda keldi');
+    }
+
+    return CustomerModel.fromJson(result);
+  }
+
   Future<CustomerModel> createCustomer({
     required String name,
     String? phone,

@@ -18,6 +18,19 @@ class OrdersRepository {
         .toList();
   }
 
+
+  Future<List<OrderModel>> listOrdersByCustomer(String customerId) async {
+    final result = await _apiClient.get('/orders?customerId=$customerId');
+
+    if (result is! List<dynamic>) {
+      throw const OrdersException('Mijoz zakazlari noto‘g‘ri formatda keldi');
+    }
+
+    return result
+        .map((item) => OrderModel.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<OrderModel> getOrder(String orderId) async {
     final result = await _apiClient.get('/orders/$orderId');
 

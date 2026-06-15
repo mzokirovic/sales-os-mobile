@@ -14,7 +14,12 @@ import 'order_permission_policy.dart';
 import 'orders_repository.dart';
 
 class CreateOrderScreen extends StatefulWidget {
-  const CreateOrderScreen({super.key});
+  const CreateOrderScreen({
+    this.initialCustomerId,
+    super.key,
+  });
+
+  final String? initialCustomerId;
 
   @override
   State<CreateOrderScreen> createState() => _CreateOrderScreenState();
@@ -39,6 +44,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedCustomerId = widget.initialCustomerId;
     _dataFuture = _loadData();
   }
 
@@ -209,40 +215,52 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                 _CompactSelectCard(
                   title: 'Mijoz',
                   value: customer?.name ?? 'Tanlanmagan',
-                  subtitle: customer?.address ?? 'Yangi mijoz qo‘shish mumkin',
+                  subtitle: customer?.address ?? 'Mijoz tanlang',
                   icon: Icons.storefront_rounded,
-                  actionLabel: CustomerPermissionPolicy.canCreateCustomer(data.user.role) ? 'Yangi' : null,
-                  onAction: CustomerPermissionPolicy.canCreateCustomer(data.user.role)
-                      ? () => context.go('/customers/create')
-                      : null,
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    initialValue: _selectedCustomerId,
-                    decoration: const InputDecoration(
-                      labelText: 'Mijoz tanlang',
-                      prefixIcon: Icon(Icons.search_rounded),
-                    ),
-                    items: data.customers.map((item) {
-                      return DropdownMenuItem(
-                        value: item.id,
-                        child: Text(
-                          item.name,
-                          overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        initialValue: _selectedCustomerId,
+                        decoration: const InputDecoration(
+                          labelText: 'Mijoz tanlang',
+                          prefixIcon: Icon(Icons.search_rounded),
                         ),
-                      );
-                    }).toList(),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Mijoz tanlang';
-                      }
+                        items: data.customers.map((item) {
+                          return DropdownMenuItem(
+                            value: item.id,
+                            child: Text(
+                              item.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Mijoz tanlang';
+                          }
 
-                      return null;
-                    },
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedCustomerId = value;
-                      });
-                    },
+                          return null;
+                        },
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedCustomerId = value;
+                          });
+                        },
+                      ),
+                      if (CustomerPermissionPolicy.canCreateCustomer(data.user.role)) ...[
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () => context.go('/customers/create?next=order'),
+                            icon: const Icon(Icons.add_rounded),
+                            label: const Text('Yangi mijoz'),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -410,8 +428,6 @@ class _CompactSelectCard extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.child,
-    this.actionLabel,
-    this.onAction,
   });
 
   final String title;
@@ -419,8 +435,6 @@ class _CompactSelectCard extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final Widget child;
-  final String? actionLabel;
-  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -481,11 +495,7 @@ class _CompactSelectCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (actionLabel != null && onAction != null)
-                  TextButton(
-                    onPressed: onAction,
-                    child: Text(actionLabel!),
-                  ),
+
               ],
             ),
             const SizedBox(height: 12),

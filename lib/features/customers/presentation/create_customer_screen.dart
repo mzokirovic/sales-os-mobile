@@ -7,7 +7,12 @@ import '../customer_permission_policy.dart';
 import '../customers_repository.dart';
 
 class CreateCustomerScreen extends StatefulWidget {
-  const CreateCustomerScreen({super.key});
+  const CreateCustomerScreen({
+    this.next,
+    super.key,
+  });
+
+  final String? next;
 
   @override
   State<CreateCustomerScreen> createState() => _CreateCustomerScreenState();
@@ -59,7 +64,7 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
     });
 
     try {
-      await _customersRepository.createCustomer(
+      final customer = await _customersRepository.createCustomer(
         name: _nameController.text.trim(),
         phone: _phoneController.text,
         address: _addressController.text,
@@ -72,7 +77,11 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
         const SnackBar(content: Text('Mijoz qo‘shildi')),
       );
 
-      context.go('/orders/create');
+      if (widget.next == 'order') {
+        context.go('/orders/create?customerId=${customer.id}');
+      } else {
+        context.go('/customers/${customer.id}');
+      }
     } catch (error) {
       if (!mounted) return;
 
