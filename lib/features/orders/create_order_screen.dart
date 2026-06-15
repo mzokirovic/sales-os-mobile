@@ -75,6 +75,17 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     });
   }
 
+  CustomerModel? _selectedCustomer(List<CustomerModel> customers) {
+    final id = _selectedCustomerId;
+    if (id == null) return null;
+
+    for (final customer in customers) {
+      if (customer.id == id) return customer;
+    }
+
+    return null;
+  }
+
   ProductModel? _selectedProduct(List<ProductModel> products) {
     final id = _selectedProductId;
     if (id == null) return null;
@@ -126,9 +137,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Zakaz yaratildi'),
-        ),
+        const SnackBar(content: Text('Zakaz yaratildi')),
       );
 
       context.go('/orders/${order.id}');
@@ -184,141 +193,147 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
             );
           }
 
-          final selectedProduct = _selectedProduct(data.products);
+          final customer = _selectedCustomer(data.customers);
+          final product = _selectedProduct(data.products);
           final quantity = _quantity();
-          final total = selectedProduct == null ? 0 : selectedProduct.price * quantity;
-          final debt = total - _paidAmount();
+          final total = product == null ? 0 : product.price * quantity;
+          final paid = _paidAmount();
+          final debt = total - paid;
 
           return Form(
             key: _formKey,
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
               children: [
-                _FormCard(
-                  children: [
-                    Row(
+                _CompactSelectCard(
+                  title: 'Mijoz',
+                  value: customer?.name ?? 'Tanlanmagan',
+                  subtitle: customer?.address ?? 'Yangi mijoz qo‘shish mumkin',
+                  icon: Icons.storefront_rounded,
+                  actionLabel: 'Yangi',
+                  onAction: () => context.go('/customers/create'),
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: _selectedCustomerId,
+                    decoration: const InputDecoration(
+                      labelText: 'Mijoz tanlang',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                    items: data.customers.map((item) {
+                      return DropdownMenuItem(
+                        value: item.id,
+                        child: Text(
+                          item.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Mijoz tanlang';
+                      }
+
+                      return null;
+                    },
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedCustomerId = value;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _CompactSelectCard(
+                  title: 'Mahsulot',
+                  value: product?.name ?? 'Tanlanmagan',
+                  subtitle: product == null ? 'Aktiv mahsulotlardan tanlang' : _formatMoney(product.price),
+                  icon: Icons.inventory_2_rounded,
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: _selectedProductId,
+                    decoration: const InputDecoration(
+                      labelText: 'Mahsulot tanlang',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                    items: data.products.map((item) {
+                      return DropdownMenuItem(
+                        value: item.id,
+                        child: Text(
+                          item.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Mahsulot tanlang';
+                      }
+
+                      return null;
+                    },
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedProductId = value;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
                       children: [
-                        const Expanded(
-                          child: Text(
-                            'Mijoz',
-                            style: TextStyle(
-                              color: Color(0xFF0F172A),
-                              fontWeight: FontWeight.w900,
+                        Expanded(
+                          child: TextFormField(
+                            controller: _quantityController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Miqdor',
+                              prefixIcon: Icon(Icons.numbers_rounded),
                             ),
+                            validator: (value) {
+                              final number = int.tryParse(value?.trim() ?? '');
+
+                              if (number == null || number <= 0) {
+                                return 'Noto‘g‘ri';
+                              }
+
+                              return null;
+                            },
+                            onChanged: (_) => setState(() {}),
                           ),
                         ),
-                        TextButton.icon(
-                          onPressed: () => context.go('/customers/create'),
-                          icon: const Icon(Icons.add_rounded),
-                          label: const Text('Yangi'),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _paidAmountController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'To‘langan',
+                              prefixIcon: Icon(Icons.payments_rounded),
+                            ),
+                            validator: (value) {
+                              final number = num.tryParse(value?.trim() ?? '');
+
+                              if (number == null || number < 0) {
+                                return 'Noto‘g‘ri';
+                              }
+
+                              return null;
+                            },
+                            onChanged: (_) => setState(() {}),
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedCustomerId,
-                      decoration: const InputDecoration(
-                        labelText: 'Tanlang',
-                        prefixIcon: Icon(Icons.storefront_rounded),
-                      ),
-                      items: data.customers.map((customer) {
-                        return DropdownMenuItem(
-                          value: customer.id,
-                          child: Text(
-                            customer.name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      }).toList(),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Mijoz tanlang';
-                        }
-
-                        return null;
-                      },
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedCustomerId = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedProductId,
-                      decoration: const InputDecoration(
-                        labelText: 'Mahsulot',
-                        prefixIcon: Icon(Icons.inventory_2_rounded),
-                      ),
-                      items: data.products.map((product) {
-                        return DropdownMenuItem(
-                          value: product.id,
-                          child: Text(
-                            product.name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      }).toList(),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Mahsulot tanlang';
-                        }
-
-                        return null;
-                      },
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedProductId = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _quantityController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Miqdor',
-                        prefixIcon: Icon(Icons.numbers_rounded),
-                      ),
-                      validator: (value) {
-                        final number = int.tryParse(value?.trim() ?? '');
-
-                        if (number == null || number <= 0) {
-                          return 'Miqdor 1 dan katta bo‘lsin';
-                        }
-
-                        return null;
-                      },
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _paidAmountController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'To‘langan',
-                        prefixIcon: Icon(Icons.payments_rounded),
-                      ),
-                      validator: (value) {
-                        final number = num.tryParse(value?.trim() ?? '');
-
-                        if (number == null || number < 0) {
-                          return 'To‘g‘ri summa kiriting';
-                        }
-
-                        return null;
-                      },
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 12),
-                _SummaryCard(
-                  product: selectedProduct,
-                  quantity: quantity,
+                _CompactSummaryCard(
                   total: total,
-                  paid: _paidAmount(),
-                  debt: debt,
+                  paid: paid,
+                  debt: debt < 0 ? 0 : debt,
                   formatMoney: _formatMoney,
                 ),
               ],
@@ -385,12 +400,24 @@ class CreateOrderException implements Exception {
   String toString() => message;
 }
 
-class _FormCard extends StatelessWidget {
-  const _FormCard({
-    required this.children,
+class _CompactSelectCard extends StatelessWidget {
+  const _CompactSelectCard({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.icon,
+    required this.child,
+    this.actionLabel,
+    this.onAction,
   });
 
-  final List<Widget> children;
+  final String title;
+  final String value;
+  final String subtitle;
+  final IconData icon;
+  final Widget child;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -398,25 +425,83 @@ class _FormCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          children: children,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: const Color(0xFF475569),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (actionLabel != null && onAction != null)
+                  TextButton(
+                    onPressed: onAction,
+                    child: Text(actionLabel!),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            child,
+          ],
         ),
       ),
     );
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
-    required this.product,
-    required this.quantity,
+class _CompactSummaryCard extends StatelessWidget {
+  const _CompactSummaryCard({
     required this.total,
     required this.paid,
     required this.debt,
     required this.formatMoney,
   });
 
-  final ProductModel? product;
-  final int quantity;
   final num total;
   final num paid;
   final num debt;
@@ -426,87 +511,67 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: product == null
-            ? const Text(
-                'Mahsulot tanlang',
-                style: TextStyle(
-                  color: Color(0xFF64748B),
-                  fontWeight: FontWeight.w800,
-                ),
-              )
-            : Column(
-                children: [
-                  _SummaryRow(
-                    label: 'Narx',
-                    value: formatMoney(product!.price),
-                  ),
-                  _SummaryRow(
-                    label: 'Miqdor',
-                    value: quantity.toString(),
-                  ),
-                  const Divider(height: 22),
-                  _SummaryRow(
-                    label: 'Jami',
-                    value: formatMoney(total),
-                    isStrong: true,
-                  ),
-                  _SummaryRow(
-                    label: 'To‘langan',
-                    value: formatMoney(paid),
-                  ),
-                  _SummaryRow(
-                    label: 'Qarz',
-                    value: formatMoney(debt < 0 ? 0 : debt),
-                    isDanger: debt > 0,
-                    isStrong: true,
-                  ),
-                ],
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Expanded(
+              child: _SummaryTile(
+                label: 'Jami',
+                value: formatMoney(total),
               ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _SummaryTile(
+                label: 'Qarz',
+                value: formatMoney(debt),
+                isDanger: debt > 0,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({
+class _SummaryTile extends StatelessWidget {
+  const _SummaryTile({
     required this.label,
     required this.value,
     this.isDanger = false,
-    this.isStrong = false,
   });
 
   final String label;
   final String value;
   final bool isDanger;
-  final bool isStrong;
 
   @override
   Widget build(BuildContext context) {
     final color = isDanger ? const Color(0xFFDC2626) : const Color(0xFF0F172A);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF64748B),
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
           ),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontWeight: isStrong ? FontWeight.w900 : FontWeight.w700,
-            ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w900,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
