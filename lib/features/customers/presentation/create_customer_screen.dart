@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../auth/data/auth_repository.dart';
+import '../customer_permission_policy.dart';
+
 import '../customers_repository.dart';
 
 class CreateCustomerScreen extends StatefulWidget {
@@ -12,6 +15,7 @@ class CreateCustomerScreen extends StatefulWidget {
 
 class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _authRepository = AuthRepository();
   final _customersRepository = CustomersRepository();
 
   final _nameController = TextEditingController();
@@ -31,6 +35,21 @@ class _CreateCustomerScreenState extends State<CreateCustomerScreen> {
   }
 
   Future<void> _submit() async {
+    final user = await _authRepository.readCurrentUser();
+
+    if (user == null || !CustomerPermissionPolicy.canCreateCustomer(user.role)) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Siz mijoz yarata olmaysiz'),
+          backgroundColor: Color(0xFFDC2626),
+        ),
+      );
+
+      return;
+    }
+
     final isValid = _formKey.currentState?.validate() ?? false;
 
     if (!isValid || _isSubmitting) return;

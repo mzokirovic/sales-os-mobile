@@ -5,6 +5,7 @@ import '../../core/auth/current_user.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/customers/customer_model.dart';
 import '../../features/customers/customers_repository.dart';
+import '../../features/customers/customer_permission_policy.dart';
 import '../../features/products/product_model.dart';
 import '../../features/products/products_repository.dart';
 import '../../shared/widgets/error_view.dart';
@@ -210,8 +211,10 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                   value: customer?.name ?? 'Tanlanmagan',
                   subtitle: customer?.address ?? 'Yangi mijoz qo‘shish mumkin',
                   icon: Icons.storefront_rounded,
-                  actionLabel: 'Yangi',
-                  onAction: () => context.go('/customers/create'),
+                  actionLabel: CustomerPermissionPolicy.canCreateCustomer(data.user.role) ? 'Yangi' : null,
+                  onAction: CustomerPermissionPolicy.canCreateCustomer(data.user.role)
+                      ? () => context.go('/customers/create')
+                      : null,
                   child: DropdownButtonFormField<String>(
                     isExpanded: true,
                     initialValue: _selectedCustomerId,
