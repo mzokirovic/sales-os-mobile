@@ -1,28 +1,63 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/features/customers/customer_permission_policy.dart';
 import 'package:mobile/features/orders/order_permission_policy.dart';
 import 'package:mobile/features/orders/order_status_policy.dart';
 
 void main() {
   group('OrderStatusPolicy', () {
-    test('owner and manager can move through the full flow', () {
-      expect(
-        OrderStatusPolicy.nextStatusForRole(
-          role: 'OWNER',
-          currentStatus: 'NEW',
-        ),
-        'CHECKED',
-      );
+    test('owner and manager can move through fulfillment flow only', () {
+      for (final role in ['OWNER', 'MANAGER']) {
+        expect(
+          OrderStatusPolicy.nextStatusForRole(
+            role: role,
+            currentStatus: 'NEW',
+          ),
+          'CHECKED',
+        );
 
-      expect(
-        OrderStatusPolicy.nextStatusForRole(
-          role: 'MANAGER',
-          currentStatus: 'DELIVERED',
-        ),
-        'PAID',
-      );
+        expect(
+          OrderStatusPolicy.nextStatusForRole(
+            role: role,
+            currentStatus: 'CHECKED',
+          ),
+          'CONFIRMED',
+        );
+
+        expect(
+          OrderStatusPolicy.nextStatusForRole(
+            role: role,
+            currentStatus: 'CONFIRMED',
+          ),
+          'PREPARING',
+        );
+
+        expect(
+          OrderStatusPolicy.nextStatusForRole(
+            role: role,
+            currentStatus: 'PREPARING',
+          ),
+          'SHIPPED',
+        );
+
+        expect(
+          OrderStatusPolicy.nextStatusForRole(
+            role: role,
+            currentStatus: 'SHIPPED',
+          ),
+          'DELIVERED',
+        );
+
+        expect(
+          OrderStatusPolicy.nextStatusForRole(
+            role: role,
+            currentStatus: 'DELIVERED',
+          ),
+          isNull,
+        );
+      }
     });
 
-    test('operator can only check and confirm orders', () {
+    test('operator can check and confirm only', () {
       expect(
         OrderStatusPolicy.nextStatusForRole(
           role: 'OPERATOR',
@@ -48,7 +83,7 @@ void main() {
       );
     });
 
-    test('warehouse can only prepare and ship orders', () {
+    test('warehouse can prepare and ship only', () {
       expect(
         OrderStatusPolicy.nextStatusForRole(
           role: 'WAREHOUSE',
@@ -74,7 +109,7 @@ void main() {
       );
     });
 
-    test('delivery can only mark shipped orders as delivered', () {
+    test('delivery can deliver only', () {
       expect(
         OrderStatusPolicy.nextStatusForRole(
           role: 'DELIVERY',
@@ -92,17 +127,19 @@ void main() {
       );
     });
 
-    test('sales cannot change status', () {
-      expect(
-        OrderStatusPolicy.nextStatusForRole(
-          role: 'SALES',
-          currentStatus: 'NEW',
-        ),
-        isNull,
-      );
+    test('sales cannot move order status', () {
+      for (final status in OrderStatusPolicy.statusFlow) {
+        expect(
+          OrderStatusPolicy.nextStatusForRole(
+            role: 'SALES',
+            currentStatus: status,
+          ),
+          isNull,
+        );
+      }
     });
 
-    test('paid orders have no next action', () {
+    test('paid is not a fulfillment status anymore', () {
       expect(
         OrderStatusPolicy.nextStatusForRole(
           role: 'OWNER',
@@ -110,20 +147,36 @@ void main() {
         ),
         isNull,
       );
+
+      expect(OrderStatusPolicy.statusFlow.contains('PAID'), isFalse);
     });
   });
 
   group('OrderPermissionPolicy', () {
-    test('owner manager sales and operator can create orders', () {
-      expect(OrderPermissionPolicy.canCreateOrder('OWNER'), isTrue);
-      expect(OrderPermissionPolicy.canCreateOrder('MANAGER'), isTrue);
-      expect(OrderPermissionPolicy.canCreateOrder('SALES'), isTrue);
-      expect(OrderPermissionPolicy.canCreateOrder('OPERATOR'), isTrue);
+    test('allowed roles can create order', () {
+      for (final role in ['OWNER', 'MANAGER', 'SALES', 'OPERATOR']) {
+        expect(OrderPermissionPolicy.canCreateOrder(role), isTrue);
+      }
     });
 
-    test('warehouse and delivery cannot create orders', () {
-      expect(OrderPermissionPolicy.canCreateOrder('WAREHOUSE'), isFalse);
-      expect(OrderPermissionPolicy.canCreateOrder('DELIVERY'), isFalse);
+    test('warehouse and delivery cannot create order', () {
+      for (final role in ['WAREHOUSE', 'DELIVERY']) {
+        expect(OrderPermissionPolicy.canCreateOrder(role), isFalse);
+      }
+    });
+  });
+
+  group('CustomerPermissionPolicy', () {
+    test('allowed roles can create customer', () {
+      for (final role in ['OWNER', 'MANAGER', 'SALES']) {
+        expect(CustomerPermissionPolicy.canCreateCustomer(role), isTrue);
+      }
+    });
+
+    test('operator warehouse delivery cannot create customer', () {
+      for (final role in ['OPERATOR', 'WAREHOUSE', 'DELIVERY']) {
+        expect(CustomerPermissionPolicy.canCreateCustomer(role), isFalse);
+      }
     });
   });
 }

@@ -1,31 +1,37 @@
 class OrderStatusPolicy {
   const OrderStatusPolicy._();
 
-  static const labels = <String, String>{
-    'NEW': 'Yangi',
-    'CHECKED': 'Tekshirildi',
-    'CONFIRMED': 'Tasdiqlandi',
-    'PREPARING': 'Tayyorlanmoqda',
-    'SHIPPED': 'Yo‘lda',
-    'DELIVERED': 'Yetkazildi',
-    'PAID': 'Yopildi',
-  };
-
-  static const actionLabels = <String, String>{
-    'CHECKED': 'Tekshirish',
-    'CONFIRMED': 'Tasdiqlash',
-    'PREPARING': 'Skladga berish',
-    'SHIPPED': 'Yo‘lga chiqarish',
-    'DELIVERED': 'Yetkazildi',
-    'PAID': 'Yopish',
-  };
+  static const List<String> statusFlow = [
+    'NEW',
+    'CHECKED',
+    'CONFIRMED',
+    'PREPARING',
+    'SHIPPED',
+    'DELIVERED',
+  ];
 
   static String label(String status) {
-    return labels[status] ?? status;
+    return switch (status) {
+      'NEW' => 'Yangi',
+      'CHECKED' => 'Tekshirildi',
+      'CONFIRMED' => 'Tasdiqlandi',
+      'PREPARING' => 'Tayyorlanmoqda',
+      'SHIPPED' => 'Yo‘lda',
+      'DELIVERED' => 'Yetkazildi',
+      'PAID' => 'To‘langan',
+      _ => status,
+    };
   }
 
-  static String actionLabel(String nextStatus) {
-    return actionLabels[nextStatus] ?? 'Statusni o‘zgartirish';
+  static String actionLabel(String status) {
+    return switch (status) {
+      'CHECKED' => 'Tekshirish',
+      'CONFIRMED' => 'Tasdiqlash',
+      'PREPARING' => 'Tayyorlash',
+      'SHIPPED' => 'Yo‘lga chiqarish',
+      'DELIVERED' => 'Yetkazildi',
+      _ => 'Statusni yangilash',
+    };
   }
 
   static String? nextStatusForRole({
@@ -34,45 +40,36 @@ class OrderStatusPolicy {
   }) {
     if (currentStatus == 'PAID') return null;
 
+    final nextStatus = _nextStatus(currentStatus);
+
+    if (nextStatus == null) return null;
+
     if (role == 'OWNER' || role == 'MANAGER') {
-      return _nextStatus(currentStatus);
+      return nextStatus;
     }
 
-    if (role == 'OPERATOR') {
-      return switch (currentStatus) {
-        'NEW' => 'CHECKED',
-        'CHECKED' => 'CONFIRMED',
-        _ => null,
-      };
+    final allowedByRole = <String, List<String>>{
+      'OPERATOR': ['CHECKED', 'CONFIRMED'],
+      'WAREHOUSE': ['PREPARING', 'SHIPPED'],
+      'DELIVERY': ['DELIVERED'],
+    };
+
+    final allowedStatuses = allowedByRole[role] ?? [];
+
+    if (!allowedStatuses.contains(nextStatus)) {
+      return null;
     }
 
-    if (role == 'WAREHOUSE') {
-      return switch (currentStatus) {
-        'CONFIRMED' => 'PREPARING',
-        'PREPARING' => 'SHIPPED',
-        _ => null,
-      };
-    }
-
-    if (role == 'DELIVERY') {
-      return switch (currentStatus) {
-        'SHIPPED' => 'DELIVERED',
-        _ => null,
-      };
-    }
-
-    return null;
+    return nextStatus;
   }
 
   static String? _nextStatus(String currentStatus) {
-    return switch (currentStatus) {
-      'NEW' => 'CHECKED',
-      'CHECKED' => 'CONFIRMED',
-      'CONFIRMED' => 'PREPARING',
-      'PREPARING' => 'SHIPPED',
-      'SHIPPED' => 'DELIVERED',
-      'DELIVERED' => 'PAID',
-      _ => null,
-    };
+    final index = statusFlow.indexOf(currentStatus);
+
+    if (index < 0 || index >= statusFlow.length - 1) {
+      return null;
+    }
+
+    return statusFlow[index + 1];
   }
 }

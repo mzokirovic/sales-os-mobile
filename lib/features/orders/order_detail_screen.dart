@@ -58,16 +58,69 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         )} so‘m';
   }
 
-  String _actionText(String nextStatus) {
-    return switch (nextStatus) {
-      'CHECKED' => 'Tekshirish',
-      'CONFIRMED' => 'Tasdiqlash',
-      'PREPARING' => 'Tayyorlash',
-      'SHIPPED' => 'Yo‘lga chiqarish',
-      'DELIVERED' => 'Yetkazildi',
-      'PAID' => 'To‘landi',
-      _ => 'Statusni yangilash',
-    };
+  String _formatDate(String? value) {
+    if (value == null || value.isEmpty) return 'Sana yo‘q';
+
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) return value;
+
+    return '${parsed.day.toString().padLeft(2, '0')}.${parsed.month.toString().padLeft(2, '0')}.${parsed.year}';
+  }
+
+  bool _canAddPayment(String? role) {
+    return role == 'OWNER' ||
+        role == 'MANAGER' ||
+        role == 'SALES' ||
+        role == 'OPERATOR';
+  }
+
+  Future<void> _openAddPaymentSheet(OrderModel order) async {
+    if (order.debtAmount <= 0) {
+      _showMessage('Bu zakaz qarzi yopilgan');
+      return;
+    }
+
+    final input = await showModalBottomSheet<CreatePaymentInput>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) {
+        return _AddPaymentSheet(
+          debtAmount: order.debtAmount,
+          formatMoney: _formatMoney,
+        );
+      },
+    );
+
+    if (input == null || !mounted) return;
+
+    try {
+      _showMessage('To‘lov qo‘shilmoqda...');
+
+      await _ordersRepository.addPayment(
+        orderId: order.id,
+        input: input,
+      );
+
+      if (!mounted) return;
+
+      _showMessage('To‘lov qo‘shildi');
+      _reload();
+    } catch (error) {
+      if (!mounted) return;
+
+      _showMessage(error.toString(), isError: true);
+    }
+  }
+
+  void _showMessage(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? const Color(0xFFDC2626) : null,
+      ),
+    );
   }
 
   Future<void> _updateStatus(String nextStatus) async {
@@ -85,20 +138,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Status yangilandi')),
-      );
-
+      _showMessage('Status yangilandi');
       _reload();
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString()),
-          backgroundColor: const Color(0xFFDC2626),
-        ),
-      );
+      _showMessage(error.toString(), isError: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -119,7 +164,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
         final nextStatus = role == null || order == null
             ? null
-            : OrderStatusPolicy.nextStatusForRole(role: role, currentStatus: order.status);
+            : OrderStatusPolicy.nextStatusForRole(
+                role: role,
+                currentStatus: order.status,
+              );
+
+        final canAddPayment = order != null &&
+            _canAddPayment(role) &&
+            order.debtAmount > 0;
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8FAFC),
@@ -164,12 +216,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     16,
                     16,
                     16,
-                    nextStatus == null ? 16 : 110,
+                    nextStatus == null && !canAddPayment ? 16 : 110,
                   ),
                   children: [
                     _OrderHero(order: data.order),
                     const SizedBox(height: 12),
                     _MoneySummaryCard(
+                      order: data.order,
+                      formatMoney: _formatMoney,
+                    ),
+                    const SizedBox(height: 12),
+                    _PaymentCard(
                       order: data.order,
                       formatMoney: _formatMoney,
                     ),
@@ -180,19 +237,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       role: data.user?.role,
                       order: data.order,
                       nextStatus: nextStatus,
-                      actionText: nextStatus == null ? null : _actionText(nextStatus),
+                      actionText: nextStatus == null
+                          ? null
+                          : OrderStatusPolicy.actionLabel(nextStatus),
                     ),
                     const SizedBox(height: 12),
                     _ProductsCard(
                       items: data.order.items,
                       formatMoney: _formatMoney,
                     ),
+                    const SizedBox(height: 12),
+                    _PaymentsHistoryCard(
+                      payments: data.order.payments,
+                      formatMoney: _formatMoney,
+                      formatDate: _formatDate,
+                    ),
                   ],
                 ),
               );
             },
           ),
-          bottomNavigationBar: nextStatus == null
+          bottomNavigationBar: order == null
               ? null
               : SafeArea(
                   top: false,
@@ -204,20 +269,40 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         top: BorderSide(color: Color(0xFFE2E8F0)),
                       ),
                     ),
-                    child: SizedBox(
-                      height: 52,
-                      child: FilledButton(
-                        onPressed: _isUpdatingStatus
-                            ? null
-                            : () => _updateStatus(nextStatus),
-                        child: _isUpdatingStatus
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2.4),
-                              )
-                            : Text(_actionText(nextStatus)),
-                      ),
+                    child: Row(
+                      children: [
+                        if (canAddPayment) ...[
+                          Expanded(
+                            child: SizedBox(
+                              height: 52,
+                              child: OutlinedButton.icon(
+                                onPressed: () => _openAddPaymentSheet(order),
+                                icon: const Icon(Icons.payments_rounded),
+                                label: const Text('To‘lov'),
+                              ),
+                            ),
+                          ),
+                          if (nextStatus != null) const SizedBox(width: 10),
+                        ],
+                        if (nextStatus != null)
+                          Expanded(
+                            child: SizedBox(
+                              height: 52,
+                              child: FilledButton(
+                                onPressed: _isUpdatingStatus
+                                    ? null
+                                    : () => _updateStatus(nextStatus),
+                                child: _isUpdatingStatus
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(strokeWidth: 2.4),
+                                      )
+                                    : Text(OrderStatusPolicy.actionLabel(nextStatus)),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -267,18 +352,7 @@ class _OrderHero extends StatelessWidget {
               children: [
                 _StatusPill(status: order.status),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'ID: ${order.id.substring(0, 8)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+                _PaymentStatusPill(status: order.paymentStatus),
               ],
             ),
             const SizedBox(height: 12),
@@ -307,16 +381,75 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _Pill(
+      text: OrderStatusPolicy.label(status),
+      background: const Color(0xFFEFF6FF),
+      foreground: const Color(0xFF2563EB),
+    );
+  }
+}
+
+class _PaymentStatusPill extends StatelessWidget {
+  const _PaymentStatusPill({
+    required this.status,
+  });
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = switch (status) {
+      'UNPAID' => 'To‘lanmagan',
+      'PARTIAL' => 'Qisman',
+      'PAID' => 'To‘liq to‘langan',
+      _ => status,
+    };
+
+    final background = switch (status) {
+      'UNPAID' => const Color(0xFFFEF2F2),
+      'PARTIAL' => const Color(0xFFFFFBEB),
+      'PAID' => const Color(0xFFF0FDF4),
+      _ => const Color(0xFFF1F5F9),
+    };
+
+    final foreground = switch (status) {
+      'UNPAID' => const Color(0xFFDC2626),
+      'PARTIAL' => const Color(0xFFD97706),
+      'PAID' => const Color(0xFF16A34A),
+      _ => const Color(0xFF64748B),
+    };
+
+    return _Pill(
+      text: label,
+      background: background,
+      foreground: foreground,
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({
+    required this.text,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String text;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
+        color: background,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        OrderStatusPolicy.label(status),
-        style: const TextStyle(
-          color: Color(0xFF2563EB),
+        text,
+        style: TextStyle(
+          color: foreground,
           fontSize: 12,
           fontWeight: FontWeight.w900,
         ),
@@ -442,6 +575,46 @@ class _MoneyTile extends StatelessWidget {
   }
 }
 
+class _PaymentCard extends StatelessWidget {
+  const _PaymentCard({
+    required this.order,
+    required this.formatMoney,
+  });
+
+  final OrderModel order;
+  final String Function(num value) formatMoney;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: const Color(0xFFFFFBEB),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.payments_rounded,
+              color: Color(0xFFD97706),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                order.debtAmount > 0
+                    ? 'Qarz ochiq: ${formatMoney(order.debtAmount)}'
+                    : 'Qarz yopilgan',
+                style: const TextStyle(
+                  color: Color(0xFF92400E),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _StatusFlowCard extends StatelessWidget {
   const _StatusFlowCard({
     required this.order,
@@ -449,19 +622,9 @@ class _StatusFlowCard extends StatelessWidget {
 
   final OrderModel order;
 
-  static const _statuses = [
-    'NEW',
-    'CHECKED',
-    'CONFIRMED',
-    'PREPARING',
-    'SHIPPED',
-    'DELIVERED',
-    'PAID',
-  ];
-
   int get _currentIndex {
-    final index = _statuses.indexOf(order.status);
-    return index < 0 ? 0 : index;
+    final index = OrderStatusPolicy.statusFlow.indexOf(order.status);
+    return index < 0 ? OrderStatusPolicy.statusFlow.length - 1 : index;
   }
 
   @override
@@ -474,7 +637,7 @@ class _StatusFlowCard extends StatelessWidget {
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
-            children: _statuses.asMap().entries.map((entry) {
+            children: OrderStatusPolicy.statusFlow.asMap().entries.map((entry) {
               final index = entry.key;
               final status = entry.value;
               final done = index <= currentIndex;
@@ -485,7 +648,7 @@ class _StatusFlowCard extends StatelessWidget {
                     label: OrderStatusPolicy.label(status),
                     done: done,
                   ),
-                  if (index != _statuses.length - 1)
+                  if (index != OrderStatusPolicy.statusFlow.length - 1)
                     Container(
                       width: 26,
                       height: 2,
@@ -553,7 +716,6 @@ class _StatusStep extends StatelessWidget {
   }
 }
 
-
 class _RoleHintCard extends StatelessWidget {
   const _RoleHintCard({
     required this.role,
@@ -567,63 +729,37 @@ class _RoleHintCard extends StatelessWidget {
   final String? nextStatus;
   final String? actionText;
 
-  bool get _isDone => order.status == 'PAID';
+  bool get _isDelivered => order.status == 'DELIVERED';
 
   String get _title {
-    if (_isDone) return 'Zakaz yakunlangan';
     if (nextStatus != null && actionText != null) return 'Keyingi amal: $actionText';
+    if (_isDelivered) return 'Mahsulot yetkazilgan';
     return 'Bu bosqich sizning rolingiz uchun emas';
   }
 
   String get _subtitle {
-    if (_isDone) {
-      return 'Bu zakaz bo‘yicha status flow tugagan.';
+    if (_isDelivered) {
+      return 'Pul holati alohida to‘lovlarda yuritiladi.';
     }
 
     if (nextStatus != null) {
-      return 'Role: ${role ?? 'Noma’lum'} • Hozirgi status: ${OrderStatusPolicy.label(order.status)}';
+      return 'Role: ${role ?? 'Noma’lum'} • Status: ${OrderStatusPolicy.label(order.status)}';
     }
 
     return 'Role: ${role ?? 'Noma’lum'} • Siz hozir bu statusni o‘zgartira olmaysiz.';
   }
 
-  IconData get _icon {
-    if (_isDone) return Icons.verified_rounded;
-    if (nextStatus != null) return Icons.play_circle_rounded;
-    return Icons.info_outline_rounded;
-  }
-
-  Color get _color {
-    if (_isDone) return const Color(0xFF16A34A);
-    if (nextStatus != null) return const Color(0xFF2563EB);
-    return const Color(0xFFF59E0B);
-  }
-
-  Color get _background {
-    if (_isDone) return const Color(0xFFF0FDF4);
-    if (nextStatus != null) return const Color(0xFFEFF6FF);
-    return const Color(0xFFFFFBEB);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: _background,
+      color: const Color(0xFFEFF6FF),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                _icon,
-                color: _color,
-              ),
+            const Icon(
+              Icons.info_outline_rounded,
+              color: Color(0xFF2563EB),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -632,8 +768,8 @@ class _RoleHintCard extends StatelessWidget {
                 children: [
                   Text(
                     _title,
-                    style: TextStyle(
-                      color: _color,
+                    style: const TextStyle(
+                      color: Color(0xFF2563EB),
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
                     ),
@@ -727,22 +863,22 @@ class _ProductItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 42,
-          height: 42,
+          width: 38,
+          height: 38,
           decoration: BoxDecoration(
             color: const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(13),
           ),
           child: const Icon(
             Icons.inventory_2_rounded,
             color: Color(0xFF475569),
-            size: 21,
+            size: 19,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -770,15 +906,236 @@ class _ProductItemRow extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: 8),
-        Text(
-          formatMoney(item.total),
-          style: const TextStyle(
-            color: Color(0xFF0F172A),
-            fontWeight: FontWeight.w900,
+        const SizedBox(width: 10),
+        Flexible(
+          child: Text(
+            formatMoney(item.total),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.end,
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PaymentsHistoryCard extends StatelessWidget {
+  const _PaymentsHistoryCard({
+    required this.payments,
+    required this.formatMoney,
+    required this.formatDate,
+  });
+
+  final List<OrderPayment> payments;
+  final String Function(num value) formatMoney;
+  final String Function(String? value) formatDate;
+
+  String _methodLabel(String? method) {
+    return switch (method) {
+      'cash' => 'Naqd',
+      'card' => 'Karta',
+      'click' => 'Click',
+      'transfer' => 'Bank',
+      'other' => 'Boshqa',
+      _ => 'Boshqa',
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: payments.isEmpty
+            ? const Text(
+                'Hali to‘lov yo‘q',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w800,
+                ),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'To‘lovlar tarixi',
+                    style: TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ...payments.map((payment) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${_methodLabel(payment.paymentMethod)} • ${formatDate(payment.createdAt)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            formatMoney(payment.amount),
+                            style: const TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _AddPaymentSheet extends StatefulWidget {
+  const _AddPaymentSheet({
+    required this.debtAmount,
+    required this.formatMoney,
+  });
+
+  final num debtAmount;
+  final String Function(num value) formatMoney;
+
+  @override
+  State<_AddPaymentSheet> createState() => _AddPaymentSheetState();
+}
+
+class _AddPaymentSheetState extends State<_AddPaymentSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _amountController = TextEditingController();
+
+  String _paymentMethod = 'cash';
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController.text = widget.debtAmount.toInt().toString();
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final valid = _formKey.currentState?.validate() ?? false;
+
+    if (!valid) return;
+
+    Navigator.of(context).pop(
+      CreatePaymentInput(
+        amount: num.parse(_amountController.text.trim()),
+        paymentMethod: _paymentMethod,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'To‘lov qo‘shish',
+                  style: TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Qarz: ${widget.formatMoney(widget.debtAmount)}',
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Summa',
+                    prefixIcon: Icon(Icons.payments_rounded),
+                  ),
+                  validator: (value) {
+                    final amount = num.tryParse(value?.trim() ?? '');
+
+                    if (amount == null || amount <= 0) {
+                      return 'To‘g‘ri summa kiriting';
+                    }
+
+                    if (amount > widget.debtAmount) {
+                      return 'To‘lov qarzdan katta bo‘lmasin';
+                    }
+
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _paymentMethod,
+                  decoration: const InputDecoration(
+                    labelText: 'To‘lov turi',
+                    prefixIcon: Icon(Icons.account_balance_wallet_rounded),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'cash', child: Text('Naqd')),
+                    DropdownMenuItem(value: 'card', child: Text('Karta')),
+                    DropdownMenuItem(value: 'click', child: Text('Click')),
+                    DropdownMenuItem(value: 'transfer', child: Text('Bank')),
+                    DropdownMenuItem(value: 'other', child: Text('Boshqa')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _paymentMethod = value ?? 'cash';
+                    });
+                  },
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: FilledButton(
+                    onPressed: _submit,
+                    child: const Text('Qo‘shish'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

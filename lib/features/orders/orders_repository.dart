@@ -1,6 +1,23 @@
 import '../../core/api/api_client.dart';
 import 'order_models.dart';
 
+class CreatePaymentInput {
+  const CreatePaymentInput({
+    required this.amount,
+    required this.paymentMethod,
+  });
+
+  final num amount;
+  final String paymentMethod;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'amount': amount,
+      'paymentMethod': paymentMethod,
+    };
+  }
+}
+
 class CreateOrderItemInput {
   const CreateOrderItemInput({
     required this.productId,
@@ -73,6 +90,22 @@ class OrdersRepository {
 
     if (result is! Map<String, dynamic>) {
       throw const OrdersException('Zakaz yaratish javobi noto‘g‘ri formatda keldi');
+    }
+
+    return OrderModel.fromJson(result);
+  }
+
+  Future<OrderModel> addPayment({
+    required String orderId,
+    required CreatePaymentInput input,
+  }) async {
+    final result = await _apiClient.post(
+      '/orders/$orderId/payments',
+      body: input.toJson(),
+    );
+
+    if (result is! Map<String, dynamic>) {
+      throw const OrdersException('To‘lov qo‘shish javobi noto‘g‘ri formatda keldi');
     }
 
     return OrderModel.fromJson(result);
