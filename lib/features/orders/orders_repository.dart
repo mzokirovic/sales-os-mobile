@@ -1,6 +1,23 @@
 import '../../core/api/api_client.dart';
 import 'order_models.dart';
 
+class CreateOrderItemInput {
+  const CreateOrderItemInput({
+    required this.productId,
+    required this.quantity,
+  });
+
+  final String productId;
+  final int quantity;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'productId': productId,
+      'quantity': quantity,
+    };
+  }
+}
+
 class OrdersRepository {
   OrdersRepository({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
@@ -17,7 +34,6 @@ class OrdersRepository {
         .map((item) => OrderModel.fromJson(item as Map<String, dynamic>))
         .toList();
   }
-
 
   Future<List<OrderModel>> listOrdersByCustomer(String customerId) async {
     final result = await _apiClient.get('/orders?customerId=$customerId');
@@ -43,20 +59,14 @@ class OrdersRepository {
 
   Future<OrderModel> createOrder({
     required String customerId,
-    required String productId,
-    required int quantity,
+    required List<CreateOrderItemInput> items,
     required num paidAmount,
   }) async {
     final result = await _apiClient.post(
       '/orders',
       body: {
         'customerId': customerId,
-        'items': [
-          {
-            'productId': productId,
-            'quantity': quantity,
-          },
-        ],
+        'items': items.map((item) => item.toJson()).toList(),
         'paidAmount': paidAmount,
       },
     );
