@@ -164,6 +164,18 @@ void main() {
         expect(OrderPermissionPolicy.canCreateOrder(role), isFalse);
       }
     });
+
+    test('allowed roles can add payment', () {
+      for (final role in ['OWNER', 'MANAGER', 'SALES', 'OPERATOR']) {
+        expect(OrderPermissionPolicy.canAddPayment(role), isTrue);
+      }
+    });
+
+    test('warehouse and delivery cannot add payment', () {
+      for (final role in ['WAREHOUSE', 'DELIVERY']) {
+        expect(OrderPermissionPolicy.canAddPayment(role), isFalse);
+      }
+    });
   });
 
   group('CustomerPermissionPolicy', () {

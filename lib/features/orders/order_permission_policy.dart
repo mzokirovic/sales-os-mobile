@@ -7,4 +7,11 @@ class OrderPermissionPolicy {
       _ => false,
     };
   }
+
+  static bool canAddPayment(String role) {
+    return switch (role) {
+      'OWNER' || 'MANAGER' || 'SALES' || 'OPERATOR' => true,
+      _ => false,
+    };
+  }
 }

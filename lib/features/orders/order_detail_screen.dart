@@ -6,6 +6,7 @@ import '../../shared/widgets/error_view.dart';
 import '../../shared/widgets/loading_view.dart';
 import '../auth/data/auth_repository.dart';
 import 'order_models.dart';
+import 'order_permission_policy.dart';
 import 'order_status_policy.dart';
 import 'orders_repository.dart';
 
@@ -65,13 +66,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (parsed == null) return value;
 
     return '${parsed.day.toString().padLeft(2, '0')}.${parsed.month.toString().padLeft(2, '0')}.${parsed.year}';
-  }
-
-  bool _canAddPayment(String? role) {
-    return role == 'OWNER' ||
-        role == 'MANAGER' ||
-        role == 'SALES' ||
-        role == 'OPERATOR';
   }
 
   Future<void> _openAddPaymentSheet(OrderModel order) async {
@@ -170,7 +164,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               );
 
         final canAddPayment = order != null &&
-            _canAddPayment(role) &&
+            role != null && OrderPermissionPolicy.canAddPayment(role) &&
             order.debtAmount > 0;
 
         return Scaffold(
