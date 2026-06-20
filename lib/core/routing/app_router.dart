@@ -9,6 +9,7 @@ import '../../features/home/presentation/home_screen.dart';
 import '../../features/orders/create_order_screen.dart';
 import '../../features/orders/order_detail_screen.dart';
 import '../../features/orders/orders_screen.dart';
+import '../../features/products/presentation/products_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -44,6 +45,10 @@ final appRouter = GoRouter(
 
         return CustomerDetailScreen(customerId: customerId);
       },
+    ),
+    GoRoute(
+      path: '/products',
+      builder: (context, state) => const ProductsScreen(),
     ),
     GoRoute(
       path: '/orders',
