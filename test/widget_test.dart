@@ -2,16 +2,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/features/customers/customer_permission_policy.dart';
 import 'package:mobile/features/orders/order_permission_policy.dart';
 import 'package:mobile/features/orders/order_status_policy.dart';
+import 'package:mobile/features/home/home_permission_policy.dart';
 
 void main() {
   group('OrderStatusPolicy', () {
     test('owner and manager can move through fulfillment flow only', () {
       for (final role in ['OWNER', 'MANAGER']) {
         expect(
-          OrderStatusPolicy.nextStatusForRole(
-            role: role,
-            currentStatus: 'NEW',
-          ),
+          OrderStatusPolicy.nextStatusForRole(role: role, currentStatus: 'NEW'),
           'CHECKED',
         );
 
@@ -189,6 +187,25 @@ void main() {
       for (final role in ['OPERATOR', 'WAREHOUSE', 'DELIVERY']) {
         expect(CustomerPermissionPolicy.canCreateCustomer(role), isFalse);
       }
+    });
+  });
+  group('HomePermissionPolicy', () {
+    test('warehouse sees orders and products but not customers', () {
+      expect(HomePermissionPolicy.canSeeOrders('WAREHOUSE'), isTrue);
+      expect(HomePermissionPolicy.canSeeProducts('WAREHOUSE'), isTrue);
+      expect(HomePermissionPolicy.canSeeCustomers('WAREHOUSE'), isFalse);
+    });
+
+    test('delivery sees only orders in mobile home', () {
+      expect(HomePermissionPolicy.canSeeOrders('DELIVERY'), isTrue);
+      expect(HomePermissionPolicy.canSeeProducts('DELIVERY'), isFalse);
+      expect(HomePermissionPolicy.canSeeCustomers('DELIVERY'), isFalse);
+    });
+
+    test('operator sees orders customers and products', () {
+      expect(HomePermissionPolicy.canSeeOrders('OPERATOR'), isTrue);
+      expect(HomePermissionPolicy.canSeeCustomers('OPERATOR'), isTrue);
+      expect(HomePermissionPolicy.canSeeProducts('OPERATOR'), isTrue);
     });
   });
 }

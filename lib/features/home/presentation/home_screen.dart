@@ -8,6 +8,7 @@ import '../../auth/data/auth_repository.dart';
 import '../../dashboard/dashboard_model.dart';
 import '../../dashboard/dashboard_repository.dart';
 import '../../orders/order_status_policy.dart';
+import '../home_permission_policy.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -55,10 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _formatMoney(num value) {
-    return '${value.toInt().toString().replaceAllMapped(
-          RegExp(r'\B(?=(\d{3})+(?!\d))'),
-          (match) => ' ',
-        )} so‘m';
+    return '${value.toInt().toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (match) => ' ')} so‘m';
   }
 
   String _roleName(String role) {
@@ -117,10 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (data == null) {
           return Scaffold(
             appBar: AppBar(title: const Text('Sales OS')),
-            body: ErrorView(
-              message: 'Ma’lumot topilmadi',
-              onRetry: _reload,
-            ),
+            body: ErrorView(message: 'Ma’lumot topilmadi', onRetry: _reload),
           );
         }
 
@@ -150,29 +145,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   roleFocus: _roleFocus(data.user.role),
                 ),
                 const SizedBox(height: 12),
-                _MetricGrid(
-                  summary: data.summary,
-                  formatMoney: _formatMoney,
-                ),
+                _MetricGrid(summary: data.summary, formatMoney: _formatMoney),
                 const SizedBox(height: 12),
-                _MainActionCard(
-                  onTap: () => context.go('/orders'),
-                ),
-                const SizedBox(height: 12),
-                _CustomersActionCard(
-                  onTap: () => context.go('/customers'),
-                ),
-                const SizedBox(height: 12),
-                _ProductsActionCard(
-                  onTap: () => context.go('/products'),
-                ),
-                const SizedBox(height: 12),
+                if (HomePermissionPolicy.canSeeOrders(data.user.role)) ...[
+                  _MainActionCard(onTap: () => context.go('/orders')),
+                  const SizedBox(height: 12),
+                ],
+                if (HomePermissionPolicy.canSeeCustomers(data.user.role)) ...[
+                  _CustomersActionCard(onTap: () => context.go('/customers')),
+                  const SizedBox(height: 12),
+                ],
+                if (HomePermissionPolicy.canSeeProducts(data.user.role)) ...[
+                  _ProductsActionCard(onTap: () => context.go('/products')),
+                  const SizedBox(height: 12),
+                ],
                 _StatusRow(summary: data.summary),
                 const SizedBox(height: 12),
-                _RecentOrders(
-                  summary: data.summary,
-                  formatMoney: _formatMoney,
-                ),
+                _RecentOrders(summary: data.summary, formatMoney: _formatMoney),
               ],
             ),
           ),
@@ -183,10 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _HomeData {
-  const _HomeData({
-    required this.user,
-    required this.summary,
-  });
+  const _HomeData({required this.user, required this.summary});
 
   final CurrentUser user;
   final DashboardSummary summary;
@@ -226,10 +212,7 @@ class _CompactHeader extends StatelessWidget {
                 color: const Color(0xFF0F172A),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: const Icon(
-                Icons.dashboard_rounded,
-                color: Colors.white,
-              ),
+              child: const Icon(Icons.dashboard_rounded, color: Colors.white),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -265,10 +248,7 @@ class _CompactHeader extends StatelessWidget {
 }
 
 class _MetricGrid extends StatelessWidget {
-  const _MetricGrid({
-    required this.summary,
-    required this.formatMoney,
-  });
+  const _MetricGrid({required this.summary, required this.formatMoney});
 
   final DashboardSummary summary;
   final String Function(num value) formatMoney;
@@ -347,10 +327,7 @@ class _MetricTile extends StatelessWidget {
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w900,
-              ),
+              style: TextStyle(color: color, fontWeight: FontWeight.w900),
             ),
           ],
         ),
@@ -360,9 +337,7 @@ class _MetricTile extends StatelessWidget {
 }
 
 class _MainActionCard extends StatelessWidget {
-  const _MainActionCard({
-    required this.onTap,
-  });
+  const _MainActionCard({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -376,10 +351,7 @@ class _MainActionCard extends StatelessWidget {
           padding: EdgeInsets.all(18),
           child: Row(
             children: [
-              Icon(
-                Icons.receipt_long_rounded,
-                color: Color(0xFF2563EB),
-              ),
+              Icon(Icons.receipt_long_rounded, color: Color(0xFF2563EB)),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -404,11 +376,8 @@ class _MainActionCard extends StatelessWidget {
   }
 }
 
-
 class _CustomersActionCard extends StatelessWidget {
-  const _CustomersActionCard({
-    required this.onTap,
-  });
+  const _CustomersActionCard({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -422,10 +391,7 @@ class _CustomersActionCard extends StatelessWidget {
           padding: EdgeInsets.all(18),
           child: Row(
             children: [
-              Icon(
-                Icons.groups_rounded,
-                color: Color(0xFF2563EB),
-              ),
+              Icon(Icons.groups_rounded, color: Color(0xFF2563EB)),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -450,11 +416,8 @@ class _CustomersActionCard extends StatelessWidget {
   }
 }
 
-
 class _ProductsActionCard extends StatelessWidget {
-  const _ProductsActionCard({
-    required this.onTap,
-  });
+  const _ProductsActionCard({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -468,10 +431,7 @@ class _ProductsActionCard extends StatelessWidget {
           padding: EdgeInsets.all(18),
           child: Row(
             children: [
-              Icon(
-                Icons.inventory_2_rounded,
-                color: Color(0xFF2563EB),
-              ),
+              Icon(Icons.inventory_2_rounded, color: Color(0xFF2563EB)),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -497,9 +457,7 @@ class _ProductsActionCard extends StatelessWidget {
 }
 
 class _StatusRow extends StatelessWidget {
-  const _StatusRow({
-    required this.summary,
-  });
+  const _StatusRow({required this.summary});
 
   final DashboardSummary summary;
 
@@ -533,10 +491,7 @@ class _StatusRow extends StatelessWidget {
 }
 
 class _RecentOrders extends StatelessWidget {
-  const _RecentOrders({
-    required this.summary,
-    required this.formatMoney,
-  });
+  const _RecentOrders({required this.summary, required this.formatMoney});
 
   final DashboardSummary summary;
   final String Function(num value) formatMoney;
