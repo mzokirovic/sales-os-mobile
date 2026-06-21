@@ -3,6 +3,6 @@ class ApiConfig {
 
   static const baseUrl = String.fromEnvironment(
     'SALES_OS_API_URL',
-    defaultValue: 'http://localhost:3000',
+    defaultValue: 'https://sales-os-backend-0y70.onrender.com',
   );
 }
