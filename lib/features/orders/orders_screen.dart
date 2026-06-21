@@ -10,10 +10,7 @@ import 'order_permission_policy.dart';
 import 'order_status_policy.dart';
 import 'orders_repository.dart';
 
-enum OrdersFilter {
-  active,
-  closed,
-}
+enum OrdersFilter { active, closed }
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -54,8 +51,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   List<OrderModel> _applyFilter(List<OrderModel> orders) {
     return switch (_filter) {
-      OrdersFilter.active => orders.where((order) => order.status != 'PAID').toList(),
-      OrdersFilter.closed => orders.where((order) => order.status == 'PAID').toList(),
+      OrdersFilter.active =>
+        orders.where((order) => order.status != 'PAID').toList(),
+      OrdersFilter.closed =>
+        orders.where((order) => order.status == 'PAID').toList(),
     };
   }
 
@@ -68,9 +67,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   String _formatMoney(num value) {
     return value.toInt().toString().replaceAllMapped(
-          RegExp(r'\B(?=(\d{3})+(?!\d))'),
-          (match) => ' ',
-        );
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (match) => ' ',
+    );
   }
 
   Color _statusColor(String status) {
@@ -79,6 +78,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       'CHECKED' => const Color(0xFF4F46E5),
       'CONFIRMED' => const Color(0xFF7C3AED),
       'PREPARING' => const Color(0xFFD97706),
+      'READY' => const Color(0xFF059669),
       'SHIPPED' => const Color(0xFFEA580C),
       'DELIVERED' => const Color(0xFF059669),
       'PAID' => const Color(0xFF0F172A),
@@ -143,8 +143,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
           }
 
           final allOrders = snapshot.data ?? [];
-          final activeCount = allOrders.where((order) => order.status != 'PAID').length;
-          final closedCount = allOrders.where((order) => order.status == 'PAID').length;
+          final activeCount = allOrders
+              .where((order) => order.status != 'PAID')
+              .length;
+          final closedCount = allOrders
+              .where((order) => order.status == 'PAID')
+              .length;
           final visibleOrders = _applyFilter(allOrders);
 
           return RefreshIndicator(
@@ -248,9 +252,13 @@ class _FilterTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = isSelected ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final backgroundColor = isSelected
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF8FAFC);
     final textColor = isSelected ? Colors.white : const Color(0xFF475569);
-    final badgeColor = isSelected ? Colors.white.withValues(alpha: 0.16) : Colors.white;
+    final badgeColor = isSelected
+        ? Colors.white.withValues(alpha: 0.16)
+        : Colors.white;
     final badgeTextColor = isSelected ? Colors.white : const Color(0xFF0F172A);
 
     return InkWell(
@@ -264,7 +272,9 @@ class _FilterTab extends StatelessWidget {
           color: backgroundColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0),
+            color: isSelected
+                ? const Color(0xFF0F172A)
+                : const Color(0xFFE2E8F0),
           ),
         ),
         child: Row(
@@ -275,10 +285,7 @@ class _FilterTab extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: textColor,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: TextStyle(color: textColor, fontWeight: FontWeight.w900),
               ),
             ),
             const SizedBox(width: 8),
@@ -288,7 +295,9 @@ class _FilterTab extends StatelessWidget {
                 color: badgeColor,
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
-                  color: isSelected ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0),
+                  color: isSelected
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : const Color(0xFFE2E8F0),
                 ),
               ),
               child: Text(
@@ -308,9 +317,7 @@ class _FilterTab extends StatelessWidget {
 }
 
 class _EmptyOrdersCard extends StatelessWidget {
-  const _EmptyOrdersCard({
-    required this.message,
-  });
+  const _EmptyOrdersCard({required this.message});
 
   final String message;
 
@@ -321,10 +328,7 @@ class _EmptyOrdersCard extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         child: Row(
           children: [
-            const Icon(
-              Icons.inbox_outlined,
-              color: Color(0xFF64748B),
-            ),
+            const Icon(Icons.inbox_outlined, color: Color(0xFF64748B)),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -473,10 +477,7 @@ class _OrderCard extends StatelessWidget {
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({
-    required this.label,
-    required this.color,
-  });
+  const _StatusPill({required this.label, required this.color});
 
   final String label;
   final Color color;
@@ -485,10 +486,7 @@ class _StatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       constraints: const BoxConstraints(maxWidth: 112),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 9,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(999),
@@ -545,10 +543,7 @@ class _MiniMetric extends StatelessWidget {
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w900,
-            ),
+            style: TextStyle(color: color, fontWeight: FontWeight.w900),
           ),
         ],
       ),

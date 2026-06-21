@@ -6,6 +6,7 @@ class OrderStatusPolicy {
     'CHECKED',
     'CONFIRMED',
     'PREPARING',
+    'READY',
     'SHIPPED',
     'DELIVERED',
   ];
@@ -16,9 +17,10 @@ class OrderStatusPolicy {
       'CHECKED' => 'Tekshirildi',
       'CONFIRMED' => 'Tasdiqlandi',
       'PREPARING' => 'Tayyorlanmoqda',
+      'READY' => 'Tayyor',
       'SHIPPED' => 'Yo‘lda',
       'DELIVERED' => 'Yetkazildi',
-      'PAID' => 'To‘langan',
+      'PAID' => 'Yopildi',
       _ => status,
     };
   }
@@ -28,42 +30,50 @@ class OrderStatusPolicy {
       'CHECKED' => 'Tekshirish',
       'CONFIRMED' => 'Tasdiqlash',
       'PREPARING' => 'Tayyorlash',
+      'READY' => 'Tayyor deb belgilash',
       'SHIPPED' => 'Yo‘lga chiqarish',
       'DELIVERED' => 'Yetkazildi',
-      _ => 'Statusni yangilash',
+      _ => label(status),
     };
   }
 
   static String? nextStatusForRole({
-    required String role,
+    required String? role,
     required String currentStatus,
   }) {
     if (currentStatus == 'PAID') return null;
 
-    final nextStatus = _nextStatus(currentStatus);
+    final nextStatus = _getNextFulfillmentStatus(currentStatus);
 
     if (nextStatus == null) return null;
+
+    // Delivery movement is controlled only by the Delivery module:
+    // READY -> SHIPPED happens when driver starts a trip.
+    // SHIPPED -> DELIVERED happens when driver delivers a stop.
+    if (nextStatus == 'SHIPPED' || nextStatus == 'DELIVERED') {
+      return null;
+    }
 
     if (role == 'OWNER' || role == 'MANAGER') {
       return nextStatus;
     }
 
-    final allowedByRole = <String, List<String>>{
-      'OPERATOR': ['CHECKED', 'CONFIRMED'],
-      'WAREHOUSE': ['PREPARING', 'SHIPPED'],
-      'DELIVERY': ['DELIVERED'],
-    };
-
-    final allowedStatuses = allowedByRole[role] ?? [];
-
-    if (!allowedStatuses.contains(nextStatus)) {
-      return null;
+    if (role == 'OPERATOR') {
+      return nextStatus == 'CHECKED' || nextStatus == 'CONFIRMED'
+          ? nextStatus
+          : null;
     }
 
-    return nextStatus;
+    if (role == 'WAREHOUSE') {
+      return nextStatus == 'PREPARING' || nextStatus == 'READY'
+          ? nextStatus
+          : null;
+    }
+
+    return null;
   }
 
-  static String? _nextStatus(String currentStatus) {
+  static String? _getNextFulfillmentStatus(String currentStatus) {
     final index = statusFlow.indexOf(currentStatus);
 
     if (index < 0 || index >= statusFlow.length - 1) {
