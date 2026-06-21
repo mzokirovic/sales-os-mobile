@@ -36,6 +36,10 @@ class _HomeScreenState extends State<HomeScreen> {
       throw const HomeException('Session topilmadi');
     }
 
+    if (HomePermissionPolicy.canSeeDeliveryTrips(user.role)) {
+      return _HomeData(user: user, summary: null);
+    }
+
     final summary = await _dashboardRepository.getSummary();
 
     return _HomeData(user: user, summary: summary);
@@ -144,24 +148,39 @@ class _HomeScreenState extends State<HomeScreen> {
                   roleName: _roleName(data.user.role),
                   roleFocus: _roleFocus(data.user.role),
                 ),
-                const SizedBox(height: 12),
-                _MetricGrid(summary: data.summary, formatMoney: _formatMoney),
-                const SizedBox(height: 12),
-                if (HomePermissionPolicy.canSeeOrders(data.user.role)) ...[
-                  _MainActionCard(onTap: () => context.go('/orders')),
+                if (HomePermissionPolicy.canSeeDeliveryTrips(
+                  data.user.role,
+                )) ...[
                   const SizedBox(height: 12),
-                ],
-                if (HomePermissionPolicy.canSeeCustomers(data.user.role)) ...[
-                  _CustomersActionCard(onTap: () => context.go('/customers')),
+                  _DeliveryTripsActionCard(
+                    onTap: () => context.go('/delivery/my-trips'),
+                  ),
+                ] else ...[
                   const SizedBox(height: 12),
-                ],
-                if (HomePermissionPolicy.canSeeProducts(data.user.role)) ...[
-                  _ProductsActionCard(onTap: () => context.go('/products')),
+                  _MetricGrid(
+                    summary: data.summary!,
+                    formatMoney: _formatMoney,
+                  ),
                   const SizedBox(height: 12),
+                  if (HomePermissionPolicy.canSeeOrders(data.user.role)) ...[
+                    _MainActionCard(onTap: () => context.go('/orders')),
+                    const SizedBox(height: 12),
+                  ],
+                  if (HomePermissionPolicy.canSeeCustomers(data.user.role)) ...[
+                    _CustomersActionCard(onTap: () => context.go('/customers')),
+                    const SizedBox(height: 12),
+                  ],
+                  if (HomePermissionPolicy.canSeeProducts(data.user.role)) ...[
+                    _ProductsActionCard(onTap: () => context.go('/products')),
+                    const SizedBox(height: 12),
+                  ],
+                  _StatusRow(summary: data.summary!),
+                  const SizedBox(height: 12),
+                  _RecentOrders(
+                    summary: data.summary!,
+                    formatMoney: _formatMoney,
+                  ),
                 ],
-                _StatusRow(summary: data.summary),
-                const SizedBox(height: 12),
-                _RecentOrders(summary: data.summary, formatMoney: _formatMoney),
               ],
             ),
           ),
@@ -175,7 +194,7 @@ class _HomeData {
   const _HomeData({required this.user, required this.summary});
 
   final CurrentUser user;
-  final DashboardSummary summary;
+  final DashboardSummary? summary;
 }
 
 class HomeException implements Exception {
@@ -330,6 +349,46 @@ class _MetricTile extends StatelessWidget {
               style: TextStyle(color: color, fontWeight: FontWeight.w900),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DeliveryTripsActionCard extends StatelessWidget {
+  const _DeliveryTripsActionCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Icon(Icons.local_shipping_rounded, color: Color(0xFF2563EB)),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Mening reyslarim',
+                  style: TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+                color: Color(0xFF94A3B8),
+              ),
+            ],
+          ),
         ),
       ),
     );

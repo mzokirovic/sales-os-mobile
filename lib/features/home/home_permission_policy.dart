@@ -3,14 +3,13 @@ class HomePermissionPolicy {
 
   static bool canSeeOrders(String role) {
     return switch (role) {
-      'OWNER' ||
-      'MANAGER' ||
-      'SALES' ||
-      'OPERATOR' ||
-      'WAREHOUSE' ||
-      'DELIVERY' => true,
+      'OWNER' || 'MANAGER' || 'SALES' || 'OPERATOR' || 'WAREHOUSE' => true,
       _ => false,
     };
+  }
+
+  static bool canSeeDeliveryTrips(String role) {
+    return role == 'DELIVERY';
   }
 
   static bool canSeeCustomers(String role) {

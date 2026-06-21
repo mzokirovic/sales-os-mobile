@@ -5,6 +5,7 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/customers/presentation/create_customer_screen.dart';
 import '../../features/customers/presentation/customer_detail_screen.dart';
 import '../../features/customers/presentation/customers_screen.dart';
+import '../../features/delivery/presentation/my_delivery_trips_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/orders/create_order_screen.dart';
 import '../../features/orders/order_detail_screen.dart';
@@ -14,18 +15,9 @@ import '../../features/products/presentation/products_screen.dart';
 final appRouter = GoRouter(
   initialLocation: '/',
   routes: [
-    GoRoute(
-      path: '/',
-      builder: (context, state) => const AuthGateScreen(),
-    ),
-    GoRoute(
-      path: '/login',
-      builder: (context, state) => const LoginScreen(),
-    ),
-    GoRoute(
-      path: '/home',
-      builder: (context, state) => const HomeScreen(),
-    ),
+    GoRoute(path: '/', builder: (context, state) => const AuthGateScreen()),
+    GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+    GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
     GoRoute(
       path: '/customers',
       builder: (context, state) => const CustomersScreen(),
@@ -51,9 +43,10 @@ final appRouter = GoRouter(
       builder: (context, state) => const ProductsScreen(),
     ),
     GoRoute(
-      path: '/orders',
-      builder: (context, state) => const OrdersScreen(),
+      path: '/delivery/my-trips',
+      builder: (context, state) => const MyDeliveryTripsScreen(),
     ),
+    GoRoute(path: '/orders', builder: (context, state) => const OrdersScreen()),
     GoRoute(
       path: '/orders/create',
       builder: (context, state) {
