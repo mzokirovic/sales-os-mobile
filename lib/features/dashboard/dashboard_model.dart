@@ -1,5 +1,6 @@
 class DashboardSummary {
   const DashboardSummary({
+    required this.canViewMoney,
     required this.totalSales,
     required this.openDebt,
     required this.ordersCount,
@@ -11,6 +12,7 @@ class DashboardSummary {
     required this.recentOrders,
   });
 
+  final bool canViewMoney;
   final num totalSales;
   final num openDebt;
   final int ordersCount;
@@ -22,11 +24,11 @@ class DashboardSummary {
   final List<DashboardRecentOrder> recentOrders;
 
   factory DashboardSummary.fromJson(Map<String, dynamic> json) {
-    final statusBreakdownJson =
-        json['statusBreakdown'] as List<dynamic>? ?? [];
+    final statusBreakdownJson = json['statusBreakdown'] as List<dynamic>? ?? [];
     final recentOrdersJson = json['recentOrders'] as List<dynamic>? ?? [];
 
     return DashboardSummary(
+      canViewMoney: json['canViewMoney'] == true,
       totalSales: json['totalSales'] as num? ?? 0,
       openDebt: json['openDebt'] as num? ?? 0,
       ordersCount: (json['ordersCount'] as num? ?? 0).toInt(),
@@ -35,20 +37,23 @@ class DashboardSummary {
       activeProductsCount: (json['activeProductsCount'] as num? ?? 0).toInt(),
       newOrdersCount: (json['newOrdersCount'] as num? ?? 0).toInt(),
       statusBreakdown: statusBreakdownJson
-          .map((item) => DashboardStatusCount.fromJson(item as Map<String, dynamic>))
+          .map(
+            (item) =>
+                DashboardStatusCount.fromJson(item as Map<String, dynamic>),
+          )
           .toList(),
       recentOrders: recentOrdersJson
-          .map((item) => DashboardRecentOrder.fromJson(item as Map<String, dynamic>))
+          .map(
+            (item) =>
+                DashboardRecentOrder.fromJson(item as Map<String, dynamic>),
+          )
           .toList(),
     );
   }
 }
 
 class DashboardStatusCount {
-  const DashboardStatusCount({
-    required this.status,
-    required this.count,
-  });
+  const DashboardStatusCount({required this.status, required this.count});
 
   final String status;
   final int count;
@@ -85,7 +90,9 @@ class DashboardRecentOrder {
       totalAmount: json['totalAmount'] as num? ?? 0,
       debtAmount: json['debtAmount'] as num? ?? 0,
       createdAt: DateTime.parse(json['createdAt'] as String),
-      customer: DashboardCustomer.fromJson(json['customer'] as Map<String, dynamic>),
+      customer: DashboardCustomer.fromJson(
+        json['customer'] as Map<String, dynamic>,
+      ),
     );
   }
 }

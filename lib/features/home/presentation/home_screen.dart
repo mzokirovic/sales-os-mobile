@@ -274,6 +274,9 @@ class _MetricGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final inProgressOrders = summary.ordersCount - summary.newOrdersCount;
+    final safeInProgressOrders = inProgressOrders < 0 ? 0 : inProgressOrders;
+
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
@@ -282,26 +285,43 @@ class _MetricGrid extends StatelessWidget {
       mainAxisSpacing: 10,
       childAspectRatio: 1.35,
       children: [
-        _MetricTile(
-          label: 'Savdo',
-          value: formatMoney(summary.totalSales),
-          icon: Icons.trending_up_rounded,
-        ),
-        _MetricTile(
-          label: 'Qarz',
-          value: formatMoney(summary.openDebt),
-          icon: Icons.warning_amber_rounded,
-          isDanger: summary.openDebt > 0,
-        ),
+        if (summary.canViewMoney) ...[
+          _MetricTile(
+            label: 'Savdo',
+            value: formatMoney(summary.totalSales),
+            icon: Icons.trending_up_rounded,
+          ),
+          _MetricTile(
+            label: 'Qarz',
+            value: formatMoney(summary.openDebt),
+            icon: Icons.warning_amber_rounded,
+            isDanger: summary.openDebt > 0,
+          ),
+        ] else ...[
+          _MetricTile(
+            label: 'Yangi zakaz',
+            value: summary.newOrdersCount.toString(),
+            icon: Icons.fiber_new_rounded,
+          ),
+          _MetricTile(
+            label: 'Jarayonda',
+            value: safeInProgressOrders.toString(),
+            icon: Icons.pending_actions_rounded,
+          ),
+        ],
         _MetricTile(
           label: 'Zakaz',
           value: summary.ordersCount.toString(),
           icon: Icons.receipt_long_rounded,
         ),
         _MetricTile(
-          label: 'Mijoz',
-          value: summary.customersCount.toString(),
-          icon: Icons.groups_rounded,
+          label: summary.canViewMoney ? 'Mijoz' : 'Aktiv mahsulot',
+          value: summary.canViewMoney
+              ? summary.customersCount.toString()
+              : summary.activeProductsCount.toString(),
+          icon: summary.canViewMoney
+              ? Icons.groups_rounded
+              : Icons.inventory_2_rounded,
         ),
       ],
     );
@@ -597,14 +617,16 @@ class _RecentOrders extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        formatMoney(order.totalAmount),
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                          fontWeight: FontWeight.w800,
+                      if (summary.canViewMoney) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          formatMoney(order.totalAmount),
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
